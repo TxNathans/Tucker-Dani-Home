@@ -17,3 +17,8 @@ household and the business we're building, so Claude has the same context on eve
 - `notes/home/` — house, maintenance, utilities, insurance.
 - `notes/personal/` — family, important dates, plans.
 - `claude-export/` — backup of our claude.ai account data (Settings → Privacy → Export data).
+- **Homefield Holdings** (the FBA / OA engine) and **Dani's Stryker files and app** live in the
+  private repo `TxNathans/homefield-stryker`, cloned next to this repo (`$HOME\homefield-stryker`).
+  Start Claude Code sessions as Local in that folder to work on them. Its scheduled jobs run in
+  GitHub Actions and Claude cloud Routines, so no computer needs to be on. Keep Homefield and
+  Stryker separate from Tucker's other work. See `notes/business/homefield-holdings.md`.
