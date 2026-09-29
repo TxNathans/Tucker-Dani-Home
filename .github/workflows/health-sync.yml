@@ -1,0 +1,80 @@
+name: Health sync
+
+# Pulls WHOOP data into notes/personal/health/whoop/ every morning and commits it.
+# First time: run this workflow by hand with "login-url", open the link, log in to WHOOP,
+# then run it again with the address you landed on pasted into "whoop_login".
+
+on:
+  schedule:
+    - cron: "47 12 * * *" # 7:47am Central (CDT), after WHOOP scores the night
+    - cron: "47 15 * * *" # 10:47am Central, catches late wake-ups
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "sync, login-url, or full-resync"
+        default: sync
+        type: choice
+        options: [sync, login-url, full-resync]
+      whoop_login:
+        description: "Only for first login: paste the localhost address WHOOP sent you to"
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: health-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      WHOOP_CLIENT_ID: ${{ vars.WHOOP_CLIENT_ID }}
+      WHOOP_CLIENT_SECRET: ${{ secrets.WHOOP_CLIENT_SECRET }}
+    steps:
+      - name: Refuse to run while the repo is public
+        if: ${{ !github.event.repository.private }}
+        run: |
+          echo "::error::This repo is public. Make it private (Settings > General > Change visibility) before syncing health data."
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install cryptography
+
+      - name: Print WHOOP login link
+        if: ${{ inputs.action == 'login-url' }}
+        run: |
+          echo "Open this link, log in to WHOOP, then copy the address of the page you land on" >> "$GITHUB_STEP_SUMMARY"
+          echo "(it starts with http://localhost/callback and will say the page can't be reached; that's expected)." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          python tools/whoop/whoop_sync.py login-url >> "$GITHUB_STEP_SUMMARY"
+
+      - name: First login and full history
+        if: ${{ inputs.whoop_login != '' }}
+        env:
+          WHOOP_LOGIN: ${{ inputs.whoop_login }}
+        run: python tools/whoop/whoop_sync.py login "$WHOOP_LOGIN"
+
+      - name: Sync
+        if: ${{ inputs.action != 'login-url' && inputs.whoop_login == '' }}
+        run: python tools/whoop/whoop_sync.py sync ${{ inputs.action == 'full-resync' && '--full' || '' }}
+
+      - name: Commit
+        if: ${{ inputs.action != 'login-url' || inputs.whoop_login != '' }}
+        run: |
+          git config user.name "health-sync"
+          git config user.email "actions@users.noreply.github.com"
+          git add .whoop notes/personal/health
+          git diff --cached --quiet && exit 0
+          git commit -m "Health sync $(date -u +%Y-%m-%d)"
+          for i in 1 2 3 4; do
+            git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+            sleep $((2 ** i))
+          done
+          exit 1
