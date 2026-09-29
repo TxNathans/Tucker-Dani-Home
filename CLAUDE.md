@@ -16,6 +16,7 @@ household and the business we're building, so Claude has the same context on eve
 - `notes/business/` — business plan, customers, vendors, pricing, decisions.
 - `notes/home/` — house, maintenance, utilities, insurance.
 - `notes/personal/` — family, important dates, plans.
+- `notes/personal/health/` — WHOOP and Apple Health data. For "how did I sleep", `git pull` then read `whoop/sleep-log.md` and `apple/sleep.csv`. Setup and how it updates: `notes/personal/health/README.md`.
 - `claude-export/` — backup of our claude.ai account data (Settings → Privacy → Export data).
 - **Homefield Holdings** (the FBA / OA engine) and **Dani's Stryker files and app** live in the
   private repo `TxNathans/homefield-stryker`, cloned next to this repo (`$HOME\homefield-stryker`).
