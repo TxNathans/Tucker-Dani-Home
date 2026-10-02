@@ -146,9 +146,50 @@ The Club rooftop with partial ocean view was not offered for these dates.
 | Tips | ~$200 |
 | **Total** | **~$4,600-$4,630** |
 
-## Next steps (Tucker or Dani)
-- [ ] Join The Excellence Collection Rewards (free) to get the member price.
-- [ ] Book the rooftop suite on excellenceresorts.com and add the honeymoon and gluten-free note.
-- [ ] Book JetBlue B6 10:07 AM Oct 17 and 2:01 PM Oct 22 in passport names.
-- [ ] Send flight info to the resort for the free transfer.
-- [ ] Book Xenotes for Oct 19 on xcaret.com and request gluten-free.
+## Points decision (Oct 2, 2026)
+Rule: only spend points when they're worth at least 1.3-1.5 cents each.
+- **Amex Platinum (about 250K points):** Pay With Points on these flights is only 1 cent each (about 95K points for $954). **Keep them** for a later trip where they're worth 1.5-2 cents or more (business class, big hotel stays). Exception: if cash is tight for the business, using about 95K on flights is fine.
+- **Chase Southwest card (Rapid Rewards):** only usable on Southwest. Southwest's Oct 17 option has a stop in Houston and takes about 6 hours. **Keep them** for a trip within the US.
+- **Pay for everything with the Amex Platinum** to get its trip insurance, airline credit and 5x points on flights booked directly with the airline.
+
+## Booking walkthrough
+**1. Setup (10 minutes)**
+- [ ] Join The Excellence Collection Rewards (free) at excellenceresorts.com, then "Join Now". This saves $153 on the rooftop suite.
+- [ ] Amex app: Benefits, then Airline Fee Credit, then pick **JetBlue** (up to $200 a year for bags and seat fees). If another airline is already picked for 2026, it can't change until January.
+- [ ] Amex app and Chase app: open the Offers tab and add any JetBlue, Excellence or Xcaret offers before booking.
+- [ ] Create a free JetBlue TrueBlue account for each of you.
+
+**2. Resort (book first: only 5 rooftop suites left)**
+- [ ] excellenceresorts.com, Excellence Coral Playa Mujeres, Oct 17-22, 2 adults, **logged in** to Rewards.
+- [ ] Two-Story Rooftop Terrace Suite with Private Pool (not Club), "Reserve now and pay later". Expect about $2,914.
+- [ ] Pay with the Platinum. Arrival is less than 30 days away, so expect the charge right away. Free cancellation until Oct 16.
+- [ ] Paste the "Note for the resort reservation" (above) into special requests.
+
+**3. Flights**
+- [ ] jetblue.com: FLL to CUN Sat Oct 17, 10:07 AM; CUN to FLL Thu Oct 22, 2:01 PM; 2 adults.
+- [ ] Names exactly as on passports (Dani: current passport name).
+- [ ] Blue Basic assigns seats at check-in, so you may be split up. Choose **Blue**, or pay for seats. The Platinum airline credit should cover seat and bag fees.
+- [ ] Pay with the Platinum and add your TrueBlue numbers.
+
+**4. Transfer:** [ ] Email flight numbers and times to the resort for the free airport pickup.
+
+**5. Xenotes:** [ ] xcaret.com, Mon Oct 19, 2 adults. Look for a promo code at checkout. Add gluten-free for Dani. Pay with the Platinum.
+
+## Honeymoon perks
+There is no published honeymoon discount. Resorts often add extras when asked.
+- Ask for: sparkling wine and room decoration on arrival, romantic turndown, a quiet room location, and a free upgrade if one is open (the reservation note already asks).
+- Ask the resort (email or phone) if they have any honeymoon or Rewards member perks, like a spa credit or private dinner.
+- Bring a copy of the marriage certificate. Many resorts want proof for honeymoon extras.
+- Call the resort 3-5 days before arrival to confirm requests are on file.
+- At check-in, say it's your honeymoon and ask kindly about upgrades. Not guaranteed, but common when rooms are open.
+
+## Final cost (no points used)
+| Item | Cost |
+|------|------|
+| Resort, Rewards price | $2,914 |
+| JetBlue | $954 |
+| Xenotes, parking, visitor tax, tips | ~$650 |
+| Bags and seats | $0 if the airline credit covers them |
+| **Total cash** | **~$4,500** |
+
+Points kept: all 250K Amex points. Points earned: about 7,700 more Amex points.
