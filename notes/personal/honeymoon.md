@@ -104,23 +104,51 @@ The resort booking engine and JetBlue's fare search still could not be run from 
 **Xenotes (Mon Oct 19)**
 - List price about $150 per adult. The 15% advance discount needs 21+ days notice, which ended Sep 28. Expect about $135 each with the smaller online discount, **about $270 for two**. Check xcaret.com for promo codes before paying. Confirm the tour runs on Monday and add the gluten-free request.
 
-### Recommendation
-1. **Book the non-Club Two-Story Rooftop Terrace Suite with Private Pool** under Last Minute Escape if it is no more than about $300 over the Junior Swim-Up Suite for the 5 nights. It is twice the size, has your own pool and jacuzzi, and is not a Club room, so it should price well under the Club rooftop.
-2. Pick the **Club rooftop (Partial Ocean View)** only if it comes in under about $3,150. Club adds lounge access, not a better room than the plain rooftop.
-3. **Junior Swim-Up** is the fallback if the rooftop is sold out or more than $300 over.
-4. Book flights the same day as the resort. Use Amex Pay With Points if cash for two is over $1,300.
+## Live prices, Oct 2, 2026 (Claude, from the booking pages)
+**Excellence Coral, Oct 17-22, 2 adults, booked direct.** 40% off, free transfer, free cancellation until Oct 16, pay later (card charged 30 days out). Taxes and fees included. This matches the Last Minute Escape offer.
 
-### Updated budget (rooftop, non-Club)
-| Item | Estimate |
-|------|----------|
-| Resort, 5 nights | ~$2,700-$2,850 (confirm at checkout) |
-| JetBlue for two | ~$1,300-$1,650 |
+| Suite | Public price, 5 nights | Rewards member price | Left |
+|-------|-----------------------|----------------------|------|
+| Junior Suite Pool View | $2,772 | $2,633 | |
+| Junior Swim-Up Suite Pool View | $2,959 | $2,811 | 2 |
+| **Two-Story Rooftop Terrace Suite with Private Pool** | **$3,067** | **$2,914** | 5 |
+| Club Junior Suite Pool or Golf View | $3,141 | | |
+| Club Junior Suite Ocean View | $3,387 | | |
+| Club Two-Story Rooftop Terrace Suite, Private Pool, Ocean View | $3,698 | about $3,513 | |
+
+The Club rooftop with partial ocean view was not offered for these dates.
+
+**JetBlue nonstop, per person, Google Flights (lowest fare, likely Blue Basic):**
+- Out Sat Oct 17: FLL 10:07 AM -> CUN 11:03 AM, $291. Or FLL 12:00 PM -> CUN 12:56 PM, $254.
+- Back Thu Oct 22: CUN 2:01 PM -> FLL 4:49 PM, $186. The 12:14 PM flight is also $186. The 2:01 PM flight is confirmed.
+- **10:07 out + 2:01 back = $477 each, $954 for two.** Taking the 12:00 PM out saves $74 total.
+- Google says these fares will likely rise at least $40 in the next 5 days.
+
+**Xenotes, Mon Oct 19:** the Xcaret site blocks Claude's browser, so there's no live price. The last known direct price was about $150 per person, with about 10-15% off online. Book on xcaret.com, not a reseller: Pelago charges $250 per person for the same tour.
+
+## Recommendation
+**Book the Two-Story Rooftop Terrace Suite with Private Pool (not Club) at $2,914 with Rewards.**
+- It costs only $103 more than the Junior Swim-Up Suite. That is well inside the $150-$300 rule, and you get twice the space, a private rooftop pool and a jacuzzi.
+- Club rooftop is $3,513+, over the $3,150 ceiling. Club adds a lounge, not a better room.
+- Only 2 swim-up and 5 rooftop suites are left. Book soon.
+
+**Flights:** JetBlue 10:07 AM out and 2:01 PM back, $954 for two. Check what Blue Basic includes before paying, and compare Amex Pay With Points.
+
+## Package total (rooftop, Rewards price)
+| Item | Cost |
+|------|------|
+| Resort, 5 nights, all-inclusive, transfers included | $2,914 |
+| JetBlue for two | $954 |
 | One checked bag RT | ~$90 |
-| Xenotes | ~$270 |
-| FLL parking, visitor tax, tips | ~$370 |
-| **Total** | **~$4,730-$5,230** |
+| Xenotes for two | ~$270-$300 |
+| FLL parking | ~$120 |
+| Mexico visitor tax | ~$50 |
+| Tips | ~$200 |
+| **Total** | **~$4,600-$4,630** |
 
-### Still to do (Tucker or Dani)
-- [ ] Run Oct 17-22, 2 adults on excellenceresorts.com and write the 5-night totals for Junior Swim-Up, Rooftop (non-Club) and Club Rooftop here.
-- [ ] Price JetBlue Oct 17 FLL 10:07 AM and Oct 22 CUN 2:01 PM (or 12:14 PM) for two.
-- [ ] Book Xenotes for Oct 19 on xcaret.com.
+## Next steps (Tucker or Dani)
+- [ ] Join The Excellence Collection Rewards (free) to get the member price.
+- [ ] Book the rooftop suite on excellenceresorts.com and add the honeymoon and gluten-free note.
+- [ ] Book JetBlue B6 10:07 AM Oct 17 and 2:01 PM Oct 22 in passport names.
+- [ ] Send flight info to the resort for the free transfer.
+- [ ] Book Xenotes for Oct 19 on xcaret.com and request gluten-free.
