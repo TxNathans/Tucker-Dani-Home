@@ -77,3 +77,12 @@ Optional extras: couples spa (~$586 with pre-arrival discount), photo session.
 - Departure moved from Friday afternoon to Saturday morning so wedding day has no airport stress.
 - Five nights instead of four (about $500 more) for more full resort days.
 - Switched to Excellence Coral: newer, bigger suites, more private-pool rooms, slightly cheaper.
+
+## Price check, Oct 2, 2026 (Claude, from search results only)
+The resort, JetBlue and fare-search sites were blocked from Claude's session, so these are not checkout prices.
+- **Promo confirmed:** Excellence Coral direct offers up to 40% off, free transfers, free cancellation and room choice for travel Aug 18 to Nov 30, 2026. Transfers need a direct, suite-only booking of 3+ nights, both arriving and leaving together.
+- **Base rate:** listings show about $456-$457/night for Oct 4-22 (about $2,285 for 5 nights), down from about $500/night in the packet.
+- **Rooftop pool suite is Excellence Club:** at Coral, the Two-Story Rooftop Terrace Suite with Private Pool (1,600 sq ft) and the Honeymoon version (2,500 sq ft, ocean view) are both Club categories. The $2,850 limit from the packet may be too low. Check real prices.
+- **Outbound:** JetBlue B6 2095 FLL 10:07 AM still listed for the week of Oct 12-18.
+- **Return:** for the week of Oct 19-25 the listing shows B6 2096 CUN 12:14 PM. The 2:01 PM flight was not confirmed. Check on jetblue.com.
+- **Fares:** JetBlue FLL-CUN October one-way from about $207. American round trip from about $408. The lowest fares are usually Blue Basic (no seat choice, carry-on rules).
