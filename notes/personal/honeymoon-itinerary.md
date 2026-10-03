@@ -46,7 +46,7 @@ Gluten-free is a **preference** for Dani, not an allergy. At each meal: "One of 
 | **Thu Oct 22** | Breakfast, last swim, pack. Check out by 12:00. Transfer to CUN about 11:00-11:30 for **B6 1796 at 2:01 PM** (lands FLL 4:49 PM). |
 
 ## Checklist
-- [ ] **Schedule the free airport transfer** (Oct 2: booking.seasonstours.com said the booking number was not valid, probably not synced yet. Retry, use the email button, or call +1 866 211 6223) with Seasons Tours: use the "SCHEDULE TRANSFER" button in the resort's confirmation email ("Your Reservation Confirmation", Oct 2). Have both flight numbers ready.
+- [ ] **Schedule the free airport transfer** (Oct 2: booking.seasonstours.com said the booking number was not valid, probably not synced yet. Retry, use the email button, or call +1 866 211 6223. Oct 2 retry: Claude filled the validate form (booking # + check-in 10/17) in Chrome; waiting on you to tick the reCAPTCHA and click Search. Result not known yet.) with Seasons Tours: use the "SCHEDULE TRANSFER" button in the resort's confirmation email ("Your Reservation Confirmation", Oct 2). Have both flight numbers ready.
 - [x] Pre-arrival request sent Oct 2 via the resort's Special Requests form (honeymoon, flights, upgrade, gluten-free preference, dinner requests, pricing for experiences). The Gmail draft is now just a backup.
 - [ ] Book Xenotes for Mon Oct 19 (by about Oct 12).
 - [ ] Pick JetBlue seats (free) and add Dani's TrueBlue number (Manage Trips, LUZLYJ).
