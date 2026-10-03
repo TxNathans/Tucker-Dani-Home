@@ -27,7 +27,7 @@ Gluten-free is a **preference** for Dani, not an allergy. At each meal: "One of 
 
 ## How to get reservations
 
-1. **Before the trip:** send the draft email (Gmail drafts, "Honeymoon arrival Oct 17"). It asks the resort to pre-book Chez Isabelle, Lobster House, Kanpai, Raíces and La Cava. If they say "book on arrival", that's normal.
+1. **Before the trip:** (done Oct 2 via the Special Requests form) send the draft email (Gmail drafts, "Honeymoon arrival Oct 17"). It asks the resort to pre-book Chez Isabelle, Lobster House, Kanpai, Raíces and La Cava. If they say "book on arrival", that's normal.
 2. **Download The Excellence Collection app.** Many Excellence resorts use it for restaurant bookings and chat with the concierge. Log in as Dani (Rewards account).
 3. **At check-in, first thing:** go to the concierge desk and book **all** the reservation dinners for the whole stay at once (Kanpai Mon, Raíces Tue, La Cava Wed). Popular slots go first. Say it's your honeymoon and ask for a good table.
 4. Ask the concierge for prices on: a private romantic dinner (beach or rooftop), the couples spa (20% off if pre-booked; see the confirmation email), and a photo session.
@@ -46,8 +46,8 @@ Gluten-free is a **preference** for Dani, not an allergy. At each meal: "One of 
 | **Thu Oct 22** | Breakfast, last swim, pack. Check out by 12:00. Transfer to CUN about 11:00-11:30 for **B6 1796 at 2:01 PM** (lands FLL 4:49 PM). |
 
 ## Checklist
-- [ ] **Schedule the free airport transfer** with Seasons Tours: use the "SCHEDULE TRANSFER" button in the resort's confirmation email ("Your Reservation Confirmation", Oct 2). Have both flight numbers ready.
-- [ ] Send the pre-arrival email (in Gmail drafts).
+- [ ] **Schedule the free airport transfer** (Oct 2: booking.seasonstours.com said the booking number was not valid, probably not synced yet. Retry, use the email button, or call +1 866 211 6223) with Seasons Tours: use the "SCHEDULE TRANSFER" button in the resort's confirmation email ("Your Reservation Confirmation", Oct 2). Have both flight numbers ready.
+- [x] Pre-arrival request sent Oct 2 via the resort's Special Requests form (honeymoon, flights, upgrade, gluten-free preference, dinner requests, pricing for experiences). The Gmail draft is now just a backup.
 - [ ] Book Xenotes for Mon Oct 19 (by about Oct 12).
 - [ ] Pick JetBlue seats (free) and add Dani's TrueBlue number (Manage Trips, LUZLYJ).
 - [ ] Download The Excellence Collection app.
