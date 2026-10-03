@@ -7,7 +7,14 @@ All prices below are from that snapshot and must be rechecked before paying for 
 - [x] **Resort BOOKED.** Excellence Coral Playa Mujeres, Two-Story Rooftop Terrace Suite with Private Pool (not Club), Oct 17-22, 5 nights, 2 adults, all-inclusive. Booking ID **unuh52xgs2**. Booked direct with the Rewards member rate (Dani's Rewards account): **$2,914** total, fees and taxes included (43% off $5,112). "Reserve now and pay later": card charged **Oct 4, 2026**. Free cancellation until Oct 16 at 3:00 PM, then the penalty is the full $2,914. Celebration set to Honeymoon. Comments: honeymoon, upgrade request, gluten-free, quiet room.
   - Declined the checkout upsell to Club Junior Suite (+$15/night): smaller room, no private pool.
   - Promo codes checked (EXCEL30 etc.): none applied on top of the member rate. The Suites + Flight bundle was not cheaper ($3,604 for the base Junior Suite vs $3,587 separately).
-- [ ] JetBlue flights
+- [x] **JetBlue BOOKED.** Confirmation code **LUZLYJ**. 2 adults (DANIELLE RIVERA, Tucker Nathans), Main fare (free seat selection, carry-on included, no change fees; JetBlue credit if cancelled, not cash). **$1,107.88** total ($718 fare + $389.88 taxes/fees).
+  - Out Sat Oct 17: B6 2095 FLL 10:07 AM -> CUN 11:03 AM.
+  - Back Thu Oct 22: B6 1796 CUN 2:01 PM -> FLL 4:49 PM.
+  - Higher than the $954 estimate: the cheaper fares sold out. Cheaper options on other sites (BudgetAir $982, Trip.com $1,006, Expedia $1,028) were all for Main Base, so we booked direct.
+  - [ ] Pick seats (free) for both flights at jetblue.com Manage Trips.
+  - [ ] Checked bags if needed (from $45 per bag each way). The Amex airline credit can cover them if JetBlue is the chosen airline.
+  - [ ] Check Dani's TrueBlue number is on her traveler record (it wasn't at checkout).
+  - Skipped Allianz trip protection ($86.96). The Amex Platinum has its own trip insurance.
 - [ ] Email the resort flight details (free transfer) + full honeymoon note
 - [ ] Xenotes, Mon Oct 19
 
