@@ -3,8 +3,13 @@
 Source: ChatGPT transfer packet, research snapshot Oct 1, 2026 (`honeymoon-transfer-packet-2026-10-01.pdf`).
 All prices below are from that snapshot and must be rechecked before paying for anything.
 
-## Status
-Nothing booked yet (as of Oct 2, 2026).
+## Status (Oct 2, 2026)
+- [x] **Resort BOOKED.** Excellence Coral Playa Mujeres, Two-Story Rooftop Terrace Suite with Private Pool (not Club), Oct 17-22, 5 nights, 2 adults, all-inclusive. Booking ID **unuh52xgs2**. Booked direct with the Rewards member rate (Dani's Rewards account): **$2,914** total, fees and taxes included (43% off $5,112). "Reserve now and pay later": card charged **Oct 4, 2026**. Free cancellation until Oct 16 at 3:00 PM, then the penalty is the full $2,914. Celebration set to Honeymoon. Comments: honeymoon, upgrade request, gluten-free, quiet room.
+  - Declined the checkout upsell to Club Junior Suite (+$15/night): smaller room, no private pool.
+  - Promo codes checked (EXCEL30 etc.): none applied on top of the member rate. The Suites + Flight bundle was not cheaper ($3,604 for the base Junior Suite vs $3,587 separately).
+- [ ] JetBlue flights
+- [ ] Email the resort flight details (free transfer) + full honeymoon note
+- [ ] Xenotes, Mon Oct 19
 
 ## The plan
 - **Wedding:** Friday Oct 16, 2026, morning, courthouse in Delray Beach, FL. Stay local that night.
