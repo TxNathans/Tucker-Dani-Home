@@ -39,6 +39,7 @@ Pattern by season:
 ### Equipment and wearables
 - **Peloton:** has an account (password reset Oct 2026).
 - **WHOOP:** bought Feb 2024, returned Mar 2024.
+- **WHOOP and Apple Health sync:** set up in `notes/personal/health/` (see its README), but no data has been pulled yet as of Oct 29, 2026. Once WHOOP is connected or an Apple Health export is added, sleep, HRV, resting HR, steps, weight and workouts land there.
 - **Mikolo power rack (Walmart):** delivered Sep 2026, returned (changed mind).
 
 ## Competitions
@@ -77,5 +78,5 @@ No lab results, injuries or medications in email. Results live in the provider p
 - [ ] What the Jan 2026 sports medicine evaluation was for, and any current injuries
 - [ ] Usual weekly schedule now that the honeymoon is over
 - [ ] Nutrition: protein target, supplements, how strict gluten-free is
-- [ ] Sleep and recovery tracking (Peloton, Apple Watch, other)
+- [ ] Sleep and recovery tracking: which device, and run the WHOOP setup or an Apple Health export so `notes/personal/health/` fills in
 - [ ] Is the Staff Membership from coaching or working at Focus?
