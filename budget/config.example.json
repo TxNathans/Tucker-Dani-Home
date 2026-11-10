@@ -1,0 +1,20 @@
+{
+  "_how_to_use": "Copy this file to budget/data/config.json (git ignores that folder) and replace the placeholder numbers with yours. Percentages are whole numbers: 6 means 6%.",
+  "age": 30,
+  "annual_salary_gross": 75000,
+  "paychecks_per_year": 26,
+  "marginal_tax_rate_pct": 22,
+  "emergency_fund_months": 6,
+  "401k": {
+    "current_contribution_pct": 4,
+    "employer_match_rate_pct": 50,
+    "employer_match_up_to_pct": 6,
+    "roth": false
+  },
+  "monthly_budgets": {
+    "Groceries": 600,
+    "Dining & Coffee": 300,
+    "Shopping": 300,
+    "Subscriptions": 60
+  }
+}
