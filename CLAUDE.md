@@ -13,6 +13,7 @@ household and the business we're building, so Claude has the same context on eve
 - Never write passwords, full account numbers, SSNs, or API keys into this repo.
 
 ## Where things live
+- `tracer/` — TRACER Baseball Performance & Analytics (tracerbpa.com), Tucker's hitting evaluation business. For any TRACER, swing, force plate, Cage View or hitting report question, read `tracer/CLAUDE.md` and `tracer/BRIEFING.md` first, then `tracer/UPDATES.md`.
 - `notes/business/` — business plan, customers, vendors, pricing, decisions.
 - `notes/home/` — house, maintenance, utilities, insurance.
 - `notes/personal/` — family, important dates, plans.
