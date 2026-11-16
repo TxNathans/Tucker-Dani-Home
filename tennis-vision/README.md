@@ -2,7 +2,7 @@
 
 Film tennis on an iPhone, upload the video, get back motion capture of the swing and a breakdown of the play.
 
-Two modes:
+Three modes:
 
 - **Swing analysis.** One player, one or more swings. Tracks 33 body landmarks and the racket, times the swing
   phases, finds contact from hand speed plus the sound of the hit, and measures joint angles, rotation, the
@@ -12,6 +12,10 @@ Two modes:
   every hit and bounce. If the camera is fixed and you mark the four court corners, it also gives landing spots,
   in/out, shot speed, serve placement, scoring, the full stat sheet, positioning (where each player stands when
   the opponent hits) and strategy advice.
+
+- **Lesson.** The same tracking, but every shot is judged on its own landing instead of as part of a point.
+  For each player it lists shots by type (forehand, backhand, volleys, overhead, serve), by where they were hit
+  from (net, mid-court, baseline), by landing depth, and in / net / long / wide.
 
 ## Run it
 
@@ -34,6 +38,7 @@ Command line, without the web app:
 python -m tennisvision.swing.pipeline clip.mov --out out/swing --height 1.70
 python -m tennisvision.match.pipeline match.mp4 --out out/match --format doubles \
     --names "Dani,Pat,Opp1,Opp2" --corners 0.30,0.29,0.69,0.27,0.81,0.80,0.20,0.78
+python -m tennisvision.match.pipeline lesson.mp4 --out out/lesson --lesson --names "Student,Coach" --corners ...
 pytest tests
 ```
 

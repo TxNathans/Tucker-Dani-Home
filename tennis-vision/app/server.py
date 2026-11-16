@@ -69,7 +69,8 @@ def run_job(job_id: str) -> None:
         else:
             from tennisvision.match.pipeline import analyze_match
             analyze_match(str(folder / job["video"]), str(folder), fmt=params["format"], names=params["names"],
-                          hands=params["hands"], corners=params["corners"], height_m=params["height_m"], progress=progress)
+                          hands=params["hands"], corners=params["corners"], height_m=params["height_m"],
+                          session="lesson" if job["kind"] == "lesson" else "match", progress=progress)
         job.update(status="done", progress=1.0, finished=time.time())
     except Exception as exc:                       # report the failure to the phone instead of dying silently
         traceback.print_exc()
@@ -82,7 +83,7 @@ def run_job(job_id: str) -> None:
 async def create_job(video: UploadFile = File(...), kind: str = Form("swing"), height_cm: float = Form(170.0),
                      hand: str = Form("auto"), format: str = Form("singles"), names: str = Form(""),
                      hands: str = Form(""), corners: str = Form(""), title: str = Form("")):
-    if kind not in ("swing", "match") or format not in ("singles", "doubles") or hand not in ("auto", "right", "left"):
+    if kind not in ("swing", "match", "lesson") or format not in ("singles", "doubles") or hand not in ("auto", "right", "left"):
         raise HTTPException(400, "Bad options")
     if not 100 <= height_cm <= 230:
         raise HTTPException(400, "Height must be between 100 and 230 cm")

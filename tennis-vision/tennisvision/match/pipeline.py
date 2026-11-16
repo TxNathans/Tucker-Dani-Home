@@ -28,6 +28,7 @@ from ..video import iter_frames, probe, read_audio, scaled_size
 from .ball import build_track, detect_candidates
 from .court import Court, refine
 from .events import detect_events
+from .lesson import lesson_breakdown
 from .players import PERSON, RACKET, Detector, PlayerTracker, boxes_array
 from .rally import Bounce, Hit, build_points, build_shots, shot_summary, split_rallies
 from .render import render_match
@@ -177,7 +178,7 @@ def shot_mocap(video_path: str, info, t_hit: float, boxes_src: np.ndarray, hand:
 
 def analyze_match(video_path: str, out_dir: str, fmt: str = "singles", names: list[str] | None = None,
                   hands: list[str] | None = None, corners: list[list[float]] | None = None, rules: Rules | None = None,
-                  mocap: bool = True, height_m: float = 1.70, progress=None) -> dict:
+                  mocap: bool = True, height_m: float = 1.70, session: str = "match", progress=None) -> dict:
     """corners: doubles-court corners as fractions of the frame (x, y in 0-1), order far-left, far-right, near-right, near-left."""
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -324,8 +325,9 @@ def analyze_match(video_path: str, out_dir: str, fmt: str = "singles", names: li
     rallies = split_rallies(hits, bounces)
     name_of = {p.id: p.name for p in players}
     rally_rows, all_shots = [], []
+    lesson = session == "lesson"
     for k, rally in enumerate(rallies):
-        shots = build_shots(rally, fmt)
+        shots = build_shots(rally, fmt, judge_all=lesson)
         all_shots += shots
         rows = []
         for s in shots:
@@ -336,7 +338,7 @@ def analyze_match(video_path: str, out_dir: str, fmt: str = "singles", names: li
         rally_rows.append(dict(n=k + 1, t_start=round(rally.t_start, 2), t_end=round(rally.t_end, 2), shots=rows))
 
     report = dict(
-        kind="match", mode=mode, format=fmt, warnings=warnings,
+        kind="match", session=session, mode=mode, format=fmt, warnings=warnings,
         video=dict(width=info.width, height=info.height, fps=round(info.fps, 2), duration=round(info.duration, 2)),
         players=[dict(asdict(p), color=COLORS[i % len(COLORS)]) for i, p in enumerate(players)],
         tracking=dict(analysis_fps=round(fps_a, 1), frames=n, ball_seen_pct=round(100 * float((~np.isnan(track[:, 0])).mean()), 1),
@@ -358,9 +360,12 @@ def analyze_match(video_path: str, out_dir: str, fmt: str = "singles", names: li
         session[p.id] = dict(name=p.name, swings_measured=len(rows), metrics=agg)
     report["session"] = session
 
+    if lesson:
+        report["lesson"] = lesson_breakdown(all_shots, players)
     if court is not None:
         report["court"] = court.to_dict()
         report["movement"] = {p.id: _movement(feet_all[i], times) for i, p in enumerate(players)}
+    if court is not None and not lesson:
         points, review = build_points(rallies, players, fmt)
         for point in points:
             lo, hi = np.searchsorted(times, [point.t_start - 1.0, point.t_end + 0.5])
@@ -407,13 +412,14 @@ def main() -> None:
     ap.add_argument("--names", default="", help="comma-separated, near side first (left to right), then far side")
     ap.add_argument("--corners", default="", help="8 numbers: far-left, far-right, near-right, near-left as x,y fractions of the frame")
     ap.add_argument("--no-mocap", action="store_true")
+    ap.add_argument("--lesson", action="store_true", help="lesson mode: judge every shot in or out on its own")
     args = ap.parse_args()
     corners = None
     if args.corners:
         v = [float(x) for x in args.corners.split(",")]
         corners = [v[i:i + 2] for i in range(0, 8, 2)]
     report = analyze_match(args.video, args.out, args.format, [s for s in args.names.split(",") if s] or None,
-                           corners=corners, mocap=not args.no_mocap)
+                           corners=corners, mocap=not args.no_mocap, session="lesson" if args.lesson else "match")
     print(f"mode: {report['mode']}  players: {[p['name'] for p in report['players']]}  ball seen: {report['tracking']['ball_seen_pct']}%")
     for w_ in report["warnings"]:
         print("warning:", w_)

@@ -100,7 +100,8 @@ def _contact(index: int, hit: Hit, bounced_before: bool) -> tuple[str, str]:
     return stroke, "groundstroke"
 
 
-def build_shots(rally: Rally, fmt: str) -> list[Shot]:
+def build_shots(rally: Rally, fmt: str, judge_all: bool = False) -> list[Shot]:
+    """judge_all: call every shot in or out from its own landing (lesson mode) instead of assuming a returned ball was good."""
     shots: list[Shot] = []
     hits = rally.hits
     for i, h in enumerate(hits):
@@ -114,7 +115,7 @@ def build_shots(rally: Rally, fmt: str) -> list[Shot]:
                     bounce_pos=landing.pos if landing else None, player_positions=dict(h.positions))
         if stroke == "serve":
             shot.serve_number = 1
-        if i + 1 < len(hits):
+        if i + 1 < len(hits) and not judge_all:
             shot.result = "in"                         # the rally went on, so it was played as good
         elif landing and h.pos is not None:
             shot.result = landing_result(landing.pos, h.pos[1], fmt, h.pos[0] if stroke == "serve" else None)

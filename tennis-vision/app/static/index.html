@@ -25,7 +25,7 @@ body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 -app
 header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line);
   padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: center; justify-content: space-between; }
 header a.brand { font-weight: 700; font-size: 18px; color: var(--ink); text-decoration: none; letter-spacing: -0.01em; }
-header nav a { color: var(--accent); text-decoration: none; font-weight: 600; margin-left: 16px; }
+header nav a { color: var(--accent); text-decoration: none; font-weight: 600; margin-left: 14px; }
 main { max-width: 760px; margin: 0 auto; padding: 16px 16px calc(40px + env(safe-area-inset-bottom)); }
 h1 { font-size: 24px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 h2 { font-size: 18px; margin: 28px 0 10px; letter-spacing: -0.01em; }
@@ -73,6 +73,9 @@ table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { text-align: left; padding: 7px 6px; border-top: 1px solid var(--line); vertical-align: top; }
 th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; border-top: 0; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.tight { font-size: 13px; }
+table.tight th, table.tight td { padding: 6px 3px; }
+table.tight th { letter-spacing: 0; font-size: 11px; }
 .scroll { overflow-x: auto; }
 .shot { display: flex; gap: 10px; align-items: baseline; padding: 9px 0; border-top: 1px solid var(--line); cursor: pointer; }
 .shot .t { color: var(--muted); font-variant-numeric: tabular-nums; width: 52px; flex: 0 0 52px; font-size: 13px; }
@@ -89,7 +92,7 @@ svg { display: block; width: 100%; height: auto; }
 <body>
 <header>
   <a class="brand" href="#/">Tennis Vision</a>
-  <nav><a href="#/new/swing">Swing</a><a href="#/new/match">Match</a></nav>
+  <nav><a href="#/new/swing">Swing</a><a href="#/new/lesson">Lesson</a><a href="#/new/match">Match</a></nav>
 </header>
 <main id="view"></main>
 
@@ -126,6 +129,8 @@ async function home() {
     <p class="muted">Film with your iPhone, upload here, get mocap and match numbers back.</p>
     <a class="card" href="#/new/swing"><div class="big">Swing analysis</div>
       <div class="muted">One player, one or more swings. Skeleton and racket tracking, contact timing, angles, speeds, coaching points.</div></a>
+    <a class="card" href="#/new/lesson"><div class="big">Lesson</div>
+      <div class="muted">Record part of a lesson. Every shot is listed with its type (forehand, backhand, volley, overhead), where it was hit from, where it landed, and in or out.</div></a>
     <a class="card" href="#/new/match"><div class="big">Match or session</div>
       <div class="muted">Singles or doubles. Tracks every player, the ball and each shot; with the court marked it adds placement, stats, positioning and strategy.</div></a>
     <h2>Recent</h2><div id="recent" class="muted">Loading…</div>`;
@@ -148,10 +153,12 @@ const heightCm = () => Math.round((+$('#ft').value * 12 + +$('#in').value) * 2.5
 
 function newJob(kind) {
   pickedCorners = null;
-  const isMatch = kind === 'match';
+  const isMatch = kind !== 'swing', isLesson = kind === 'lesson';
   view.innerHTML = `
-    <h1>${isMatch ? 'Match or session' : 'Swing analysis'}</h1>
-    <p class="muted">${isMatch
+    <h1>${isLesson ? 'Lesson' : isMatch ? 'Match or session' : 'Swing analysis'}</h1>
+    <p class="muted">${isLesson
+      ? 'Prop the phone high behind the baseline with the whole court in view and leave it still. Mark the court below: in and out calls depend on it.'
+      : isMatch
       ? 'Best results: phone on a tripod or fence mount, high behind the baseline, whole court in view, not moving.'
       : 'Best results: whole body in view, side-on or behind, 60 fps or slow-motion. Short clips process fastest.'}</p>
     <form id="f">
@@ -163,7 +170,7 @@ function newJob(kind) {
         <label>Players <span class="muted small">(near side first, left to right, then far side)</span></label>
         <div id="names" class="grid2"></div>
         <div id="courtStep" class="hide">
-          <label>Mark the court <span class="muted small">(optional: unlocks placement, speeds, positioning, strategy)</span></label>
+          <label>Mark the court <span class="muted small">(${isLesson ? 'needed for where shots land and in or out' : 'optional: unlocks placement, speeds, positioning, strategy'})</span></label>
           <p class="small muted" id="pickHint"></p>
           <canvas class="pick" id="pick"></canvas>
           <div class="row" style="margin-top:8px"><button type="button" class="ghost small" id="redo">Start over</button><span class="small muted" id="pickState"></span></div>
@@ -175,7 +182,7 @@ function newJob(kind) {
       <p id="msg" class="err"></p>
       <button id="go" style="width:100%;margin-top:14px">Analyze</button>
     </form>`;
-  if (isMatch) setupMatchForm();
+  if (isMatch) setupMatchForm(isLesson);
   $('#f').addEventListener('submit', async ev => {
     ev.preventDefault();
     const file = $('#video').files[0];
@@ -193,10 +200,11 @@ function newJob(kind) {
   });
 }
 
-function setupMatchForm() {
+function setupMatchForm(isLesson) {
   const drawNames = () => {
     const doubles = $('#fmt .on').dataset.v === 'doubles';
-    const labels = doubles ? ['Near left', 'Near right', 'Far left', 'Far right'] : ['Near player', 'Far player'];
+    const labels = doubles ? ['Near left', 'Near right', 'Far left', 'Far right']
+      : isLesson ? ['Near side (e.g. student)', 'Far side (e.g. coach)'] : ['Near player', 'Far player'];
     $('#names').innerHTML = labels.map(l => `<input type="text" placeholder="${l}" aria-label="${l}" maxlength="40">`).join('');
   };
   $('#fmt').addEventListener('click', ev => {
@@ -372,6 +380,29 @@ function mocapLine(metrics) {
   return Object.keys(short).filter(k => metrics[k] && metrics[k].value !== null).map(k => `${short[k]} ${fmt(metrics[k].value)} ${esc(metrics[k].unit)}`).join(' · ');
 }
 
+function tallyTable(title, groups, first) {
+  const rows = Object.entries(groups);
+  if (!rows.length) return '';
+  return `<h3 style="margin-top:14px">${title}</h3><div class="scroll"><table class="tight">
+    <tr><th>${first}</th><th class="num">Shots</th><th class="num">In</th><th class="num">Net</th><th class="num">Long</th><th class="num">Wide</th><th class="num">In %</th></tr>
+    ${rows.map(([k, v]) => `<tr><td>${nice(k)}</td><td class="num">${v.shots}</td><td class="num">${v.made}</td><td class="num">${v.net}</td><td class="num">${v.long}</td><td class="num">${v.wide}</td><td class="num">${pctTxt(v.in_pct)}</td></tr>`).join('')}
+  </table></div>`;
+}
+function lessonSection(r) {
+  const calibrated = r.mode === 'calibrated';
+  return `<h2>Lesson breakdown</h2>
+    ${calibrated ? '' : '<div class="card small muted">The court was not marked (or the camera moved), so shots are counted and classified but landing spots and in or out are not available.</div>'}
+    ${r.players.map(p => { const L = r.lesson[p.id], t = L.total;
+      if (!t.shots) return `<div class="card"><h3><span class="dot" style="background:${p.color}"></span> ${esc(p.name)}</h3><p class="muted">No shots seen.</p></div>`;
+      return `<div class="card"><h3><span class="dot" style="background:${p.color}"></span> ${esc(p.name)}</h3>
+        <p><span class="big">${t.shots}</span> shots${t.judged ? ` · <b>${t.made} of ${t.judged}</b> in (${pctTxt(t.in_pct)})` : ''}${t.not_seen ? ` · <span class="muted">${t.not_seen} landing${t.not_seen === 1 ? '' : 's'} not seen</span>` : ''}</p>
+        ${L.most_common_miss ? `<p class="small muted">Most common miss: ${nice(L.most_common_miss)}.</p>` : ''}
+        ${tallyTable('By shot type', L.by_kind, 'Shot')}
+        ${tallyTable('By where it was hit from', L.by_hit_zone, 'Position')}
+        ${tallyTable('By landing depth (balls that went in)', L.by_depth, 'Depth')}</div>`; }).join('')}
+    <p class="small muted">In and out are estimates from one camera. A ball within about 12 cm of a line counts as in. "Not seen" means the bounce was not detected, usually because it was hidden or too close to the next hit.</p>`;
+}
+
 function statRows(stats, rows) {
   const t = stats.teams;
   return rows.map(([label, f]) => `<tr><td>${label}</td><td class="num">${f(t['0'])}</td><td class="num">${f(t['1'])}</td></tr>`).join('');
@@ -395,6 +426,8 @@ function matchReport(job) {
     ${videoBlock(id)}
     <p class="small muted">${r.players.map(p => `<span class="dot" style="background:${p.color}"></span> ${esc(p.name)}`).join(' &nbsp; ')}</p>
 
+    ${r.lesson ? lessonSection(r) : ''}
+    <div class="${r.lesson ? 'hide' : ''}">
     <h2>Where to stand and what to play</h2>
     ${recs.length ? recs.map(x => `<div class="card rec p${x.priority}"><h3>${esc(x.title)}</h3><p class="small muted">${esc(x.evidence)}</p><p>${esc(x.advice)}</p></div>`).join('')
       : `<div class="card small muted">${calibrated
@@ -405,14 +438,15 @@ function matchReport(job) {
         ${r.players.map(p => { const z = posAll.players[p.id].zones, rc = posAll.players[p.id].recovery, g = n => pctTxt(z[n] ? z[n].share_pct : 0);
           return `<tr><td>${esc(p.name)}</td><td class="num">${g('net')}</td><td class="num">${g('no_mans_land')}</td><td class="num">${g('baseline')}</td><td class="num">${g('deep_behind')}</td><td class="num">${rc.avg_error_m === null ? '–' : rc.avg_error_m + ' m'}</td></tr>`; }).join('')}
       </table></div><p class="small muted">"Off ideal spot" is the average sideways distance from the best recovery position at the moment the opponent makes contact (singles, baseline rallies).</p></div>` : ''}
+    </div>
 
     <h2>Shots</h2>
-    <div class="card">${shots.length ? r.rallies.map(ra => `<div class="small muted" style="margin-top:6px">Rally ${ra.n} · ${ra.shots.length} shot${ra.shots.length === 1 ? '' : 's'}</div>
+    <div class="card">${shots.length ? r.rallies.map(ra => `<div class="small muted" style="margin-top:6px">${r.lesson ? 'Sequence' : 'Rally'} ${ra.n} · ${ra.shots.length} shot${ra.shots.length === 1 ? '' : 's'}</div>
       ${ra.shots.map(s => `<div class="shot" data-seek="${Math.max(0, s.t - 1).toFixed(2)}"><span class="t">${s.t.toFixed(1)}s</span><span class="dot" style="background:${color[s.player]}"></span>
         <div style="flex:1"><b>${esc(s.name)}</b> ${shotLabel(s)}
           ${s.unsure_player ? '<span class="chip warn">check player</span>' : ''}
           ${s.mocap ? `<div class="small muted">${mocapLine(s.mocap.metrics)}</div>` : ''}</div>
-        <span class="small">${s.result === 'in' || s.result === 'unknown' ? '' : nice(s.result)} ${s.speed_kmh ? Math.round(s.speed_kmh * 0.621) + ' mph' : ''}</span></div>`).join('')}`).join('')
+        <span class="small">${r.lesson ? (s.result === 'unknown' ? '' : `<b>${s.result === 'in' ? 'in' : nice(s.result)}</b>`) : (s.result === 'in' || s.result === 'unknown' ? '' : nice(s.result))} ${s.speed_kmh ? Math.round(s.speed_kmh * 0.621) + ' mph' : ''}</span></div>`).join('')}`).join('')
       : '<p class="muted">No shots were detected.</p>'}
       <p class="small muted">Tap a shot to jump the video to it.</p></div>
 
