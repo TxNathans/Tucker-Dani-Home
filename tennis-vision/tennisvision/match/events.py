@@ -20,6 +20,7 @@ class Event:
     strength: float = 0.0
     court_xy: tuple[float, float] | None = None
     heard: bool = False          # an impact sound lines up with it
+    unsure_player: bool = False  # two players were within reach of the ball
 
 
 def _fit_velocity(track: np.ndarray, idx: np.ndarray) -> np.ndarray | None:
@@ -56,8 +57,44 @@ def reach_distance(ball: np.ndarray, box: np.ndarray) -> float:
     return float(np.hypot(dx, dy) / max(h, 1.0))
 
 
+def _overlap(a: np.ndarray, b: np.ndarray) -> float:
+    if np.isnan(a[0]) or np.isnan(b[0]):
+        return 0.0
+    x0, y0, x1, y1 = max(a[0], b[0]), max(a[1], b[1]), min(a[2], b[2]), min(a[3], b[3])
+    inter = max(0.0, x1 - x0) * max(0.0, y1 - y0)
+    return inter / min((a[2] - a[0]) * (a[3] - a[1]), (b[2] - b[0]) * (b[3] - b[1]))
+
+
+def _racket_holder(ball, rackets: dict[int, np.ndarray], frame: int, player_boxes: np.ndarray, among: list[int]) -> int | None:
+    """Of the players in reach, the one whose body is closest to the racket that is at the ball."""
+    best_racket, best_d = None, None
+    for f in range(frame - 2, frame + 3):
+        for r in rackets.get(f, []):
+            centre = np.array([(r[0] + r[2]) / 2, (r[1] + r[3]) / 2])
+            d = np.hypot(*(centre - ball)) / max(np.hypot(r[2] - r[0], r[3] - r[1]), 1.0)
+            if d < 1.5 and (best_d is None or d < best_d):
+                best_racket, best_d = (centre, f), d
+    if best_racket is None:
+        return None
+    centre, f = best_racket
+    gaps = []
+    for p in among:
+        b = player_boxes[p, min(f, player_boxes.shape[1] - 1)]
+        if np.isnan(b[0]):
+            gaps.append(np.inf)
+            continue
+        dx = max(b[0] - centre[0], 0, centre[0] - b[2])
+        dy = max(b[1] - centre[1], 0, centre[1] - b[3])
+        gaps.append(np.hypot(dx, dy) / max(b[3] - b[1], 1.0))
+    order = np.argsort(gaps)
+    if len(order) > 1 and gaps[order[1]] - gaps[order[0]] < 0.05:
+        return None                              # both bodies are equally close to the racket
+    return among[int(order[0])]
+
+
 def detect_events(track: np.ndarray, times: np.ndarray, player_boxes: np.ndarray, frame_size: tuple[int, int],
-                  sounds: list[tuple[float, float]] | None = None, court=None, min_gap_s: float = 0.2) -> list[Event]:
+                  sounds: list[tuple[float, float]] | None = None, court=None, min_gap_s: float = 0.2,
+                  rackets: dict[int, np.ndarray] | None = None) -> list[Event]:
     """track (N,2) px with NaN gaps; player_boxes (P,N,4). Returns time-ordered hits and bounces."""
     n = len(track)
     fps = 1.0 / np.median(np.diff(times)) if n > 1 else 30.0
@@ -88,6 +125,13 @@ def detect_events(track: np.ndarray, times: np.ndarray, player_boxes: np.ndarray
         dists = [reach_distance(ball, player_boxes[p, i]) for p in range(len(player_boxes))]
         nearest = int(np.argmin(dists)) if dists else None
         near_player = nearest is not None and dists[nearest] < 0.15
+        in_reach = [p for p, d in enumerate(dists) if d < 0.15]
+        unsure = False
+        if len(in_reach) > 1:
+            holder = _racket_holder(ball, rackets, i, player_boxes, in_reach) if rackets is not None else None
+            if holder is not None:
+                nearest = holder
+            unsure = holder is None or _overlap(player_boxes[in_reach[0], i], player_boxes[in_reach[1], i]) > 0.1
         heard = bool(len(sound_times)) and bool(np.any(np.abs(sound_times - times[i]) < 0.12))
         before = _fit_velocity(track, np.arange(max(0, i - 4), i + 1))
         after = _fit_velocity(track, np.arange(i, min(n, i + 5)))
@@ -97,12 +141,12 @@ def detect_events(track: np.ndarray, times: np.ndarray, player_boxes: np.ndarray
         upward_kick = dv[i, 1] < -0.4 * threshold
         if near_player and reverses:
             kind = "hit"
-        elif upward_kick and not reverses:
-            kind = "bounce"
+        elif upward_kick and size[i] <= 12 * threshold:
+            kind = "bounce"                 # larger jumps than this are tracking glitches, not bounces
         else:
             continue
         ev = Event(kind, i, float(times[i]), (float(ball[0]), float(ball[1])), nearest if kind == "hit" else None,
-                   float(size[i] / threshold), heard=heard)
+                   float(size[i] / threshold), heard=heard, unsure_player=unsure and kind == "hit")
         if kind == "bounce" and court is not None:
             cx, cy = court.to_court([ball])[0]
             ev.court_xy = (float(cx), float(cy))

@@ -87,69 +87,79 @@ class BallDetector:
         return out
 
 
-def link_track(candidates: list[list[tuple[float, float, float]]], max_jump: float) -> np.ndarray:
-    """Pick one candidate per frame by motion consistency. Returns (N, 2) with NaN where the ball is not seen."""
-    n = len(candidates)
-    track = np.full((n, 2), np.nan)
-    last, velocity, gap = None, np.zeros(2), 0
-    for i, cands in enumerate(candidates):
-        if not cands:
-            gap += 1
-            if gap > 8:
-                last = None
-            continue
-        if last is None:
-            choice = cands[0]
-        else:
-            pred = last + velocity * (gap + 1)
-            reach = max_jump * (gap + 1)
-            near = [c for c in cands if np.hypot(c[0] - pred[0], c[1] - pred[1]) < reach]
-            if not near:
-                gap += 1
-                if gap > 8:
-                    last = None
+def _drop_stationary(cands, radius: float, window: int = 20, min_hits: int = 8):
+    """Remove detections that keep showing up at one spot (lights, marks, a ball lying on the court)."""
+    out = []
+    for i, frame in enumerate(cands):
+        kept = []
+        for c in frame:
+            frames_hit = [j for j in range(max(0, i - window), min(len(cands), i + window + 1))
+                          if j != i and any(np.hypot(c[0] - o[0], c[1] - o[1]) < radius for o in cands[j])]
+            if len(frames_hit) >= min_hits and max(frames_hit) - min(frames_hit) >= 12:
                 continue
-            choice = min(near, key=lambda c: np.hypot(c[0] - pred[0], c[1] - pred[1]) - 0.5 * c[2])
-        pos = np.array(choice[:2])
-        if last is not None:
-            velocity = (pos - last) / (gap + 1)
-        last, gap = pos, 0
-        track[i] = pos
+            kept.append(c)
+        out.append(kept)
+    return out
+
+
+def link_track(cands: list[list[tuple[float, float, float]]], max_jump: float) -> np.ndarray:
+    """Chain detections into flight segments by motion consistency, then keep the best segment at each moment.
+
+    Returns (N, 2) with NaN where the ball is not seen.
+    """
+    n = len(cands)
+    cands = _drop_stationary(cands, radius=max(2.0, 0.022 * max_jump))
+    open_tracks: list[dict] = []
+    done: list[dict] = []
+    for i in range(n):
+        free = list(cands[i])
+        for tr in sorted(open_tracks, key=lambda t: -len(t["frames"])):
+            gap = i - tr["frames"][-1]
+            last = tr["pts"][-1]
+            if len(tr["pts"]) >= 2:
+                span = tr["frames"][-1] - tr["frames"][-2]
+                vel = (tr["pts"][-1] - tr["pts"][-2]) / span
+                pred = last + vel * gap
+                tol = max(0.12 * max_jump, 0.6 * np.linalg.norm(vel)) * gap ** 0.5 + 0.06 * max_jump
+            else:
+                pred, tol = last, max_jump * gap
+            best, best_d = None, tol
+            for c in free:
+                d = np.hypot(c[0] - pred[0], c[1] - pred[1])
+                if d < best_d and np.hypot(c[0] - last[0], c[1] - last[1]) < max_jump * gap:
+                    best, best_d = c, d
+            if best is not None:
+                free.remove(best)
+                tr["frames"].append(i)
+                tr["pts"].append(np.array(best[:2]))
+                tr["score"] += best[2]
+        for c in free:
+            open_tracks.append(dict(frames=[i], pts=[np.array(c[:2])], score=c[2]))
+        still_open = []
+        for tr in open_tracks:
+            (done if i - tr["frames"][-1] >= 4 else still_open).append(tr)
+        open_tracks = still_open
+    done.extend(open_tracks)
+    good = []
+    for tr in done:
+        extent = np.ptp(np.array(tr["pts"]), axis=0).max()      # a real flight covers ground; a false spot does not
+        if len(tr["frames"]) >= 4 and extent > 0.15 * max_jump:
+            good.append(tr)
+    track = np.full((n, 2), np.nan)
+    owner = np.full(n, -1)
+    for k, tr in sorted(enumerate(good), key=lambda kv: -len(kv[1]["frames"]) * (1 + kv[1]["score"] / max(len(kv[1]["frames"]), 1))):
+        lo, hi = tr["frames"][0], tr["frames"][-1]
+        if (owner[lo:hi + 1] >= 0).mean() > 0.3:
+            continue                                  # a stronger segment already covers this time
+        for f, p in zip(tr["frames"], tr["pts"]):
+            if owner[f] < 0:
+                track[f], owner[f] = p, k
     return track
 
 
-def clean_track(track: np.ndarray, max_jump: float, max_gap: int = 6, min_run: int = 5) -> np.ndarray:
-    """Remove things that are not a ball in flight (stationary spots, scattered blips), then bridge short gaps."""
+def clean_track(track: np.ndarray, max_jump: float, max_gap: int = 6) -> np.ndarray:
+    """Bridge short gaps where the two ends agree with one continuous flight."""
     out = track.copy()
-    n = len(out)
-    # 1. a ball in play is never still: drop points that sit in one place for several frames
-    still_px = max(1.5, 0.0025 * max_jump / 0.09)
-    i = 0
-    while i < n:
-        if np.isnan(out[i, 0]):
-            i += 1
-            continue
-        j = i + 1
-        while j < n and not np.isnan(out[j, 0]) and np.hypot(*(out[j] - out[i])) < still_px * max(1, (j - i)) ** 0.5 * 1.5:
-            j += 1
-        if j - i >= 4:
-            out[i:j] = np.nan
-        i = j if j > i + 1 else i + 1
-    # 2. split into runs of consistent motion and drop the short ones
-    seen = np.where(~np.isnan(out[:, 0]))[0]
-    runs, cur = [], []
-    for k in seen:
-        if cur and (k - cur[-1] > 3 or np.hypot(*(out[k] - out[cur[-1]])) > max_jump * (k - cur[-1])):
-            runs.append(cur)
-            cur = []
-        cur.append(k)
-    if cur:
-        runs.append(cur)
-    for run in runs:
-        travel = np.hypot(*(out[run[-1]] - out[run[0]])) if len(run) > 1 else 0.0
-        if len(run) < min_run or travel < 4 * still_px:
-            out[run] = np.nan
-    # 3. bridge short gaps where the two ends agree with one continuous flight
     idx = np.where(~np.isnan(out[:, 0]))[0]
     for a, b in zip(idx[:-1], idx[1:]):
         if 1 < b - a <= max_gap + 1 and np.hypot(*(out[b] - out[a])) < 0.6 * max_jump * (b - a):
