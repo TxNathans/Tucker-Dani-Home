@@ -1,0 +1,12 @@
+numpy
+scipy
+opencv-python-headless
+mediapipe
+onnxruntime
+gdown
+fastapi
+uvicorn[standard]
+python-multipart
+pytest
+# PyTorch (ball tracker). CPU build: pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch

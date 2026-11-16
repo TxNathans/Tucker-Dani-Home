@@ -1,0 +1,72 @@
+"""Video in, swing report out."""
+from __future__ import annotations
+
+import argparse
+import json
+from dataclasses import asdict
+from pathlib import Path
+
+from ..pose import extract_pose
+from ..video import probe, read_audio
+from .analyze import SwingAnalyzer, session_summary
+from .render import render_overlay
+
+AUDIO_RATE = 16000
+
+
+def analyze_video(video_path: str, out_dir: str, height_m: float = 1.70, handedness: str = "auto",
+                  model: str = "heavy", progress=None) -> dict:
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    step = lambda lo, hi: (lambda f: progress(lo + (hi - lo) * f)) if progress else None
+    info = probe(video_path)
+    seq = extract_pose(video_path, variant=model, info=info, progress=step(0.0, 0.6))
+    seq.save(str(out / "pose.npz"))
+    if seq.detected.mean() < 0.5:
+        raise ValueError("Could not find a player in most frames. Film so the whole body is visible.")
+    audio = read_audio(video_path, AUDIO_RATE) if info.has_audio else None
+    analyzer = SwingAnalyzer(seq, height_m, handedness, audio, AUDIO_RATE)
+    swings = analyzer.analyze()
+    keyframes = render_overlay(video_path, str(out / "overlay.mp4"), analyzer, swings, info,
+                               keyframe_dir=str(out), progress=step(0.6, 1.0))
+    report = dict(
+        kind="swing",
+        video=dict(width=info.width, height=info.height, fps=round(info.fps, 2), duration=round(info.duration, 2),
+                   frames=info.n_frames, pose_frames_detected=int(seq.detected.sum())),
+        player=dict(height_m=height_m, hand=analyzer.hand, metres_per_pixel=round(analyzer.m_per_px, 5),
+                    camera_distance_m=round(analyzer.distance_m, 1)),
+        swings=[asdict(s) for s in swings],
+        summary=session_summary(swings),
+        keyframes=keyframes,
+        series=analyzer.series(),
+        files=dict(overlay="overlay.mp4", pose="pose.npz"),
+        caveats=[
+            "One camera: speeds are measured across the camera view, so motion toward or away from the phone is under-counted.",
+            "Rotation and joint angles use a single-camera 3D estimate, good to about +/-10-15 degrees. Compare swings filmed from the same spot.",
+            "Typical ranges are coaching reference values, not pass/fail grades.",
+        ],
+    )
+    (out / "report.json").write_text(json.dumps(report, indent=1))
+    if progress:
+        progress(1.0)
+    return report
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Tennis swing mocap analysis")
+    ap.add_argument("video")
+    ap.add_argument("--out", default="out/swing")
+    ap.add_argument("--height", type=float, default=1.70, help="player height in metres")
+    ap.add_argument("--hand", default="auto", choices=["auto", "right", "left"])
+    ap.add_argument("--model", default="heavy", choices=["lite", "full", "heavy"])
+    args = ap.parse_args()
+    report = analyze_video(args.video, args.out, args.height, args.hand, args.model)
+    for s in report["swings"]:
+        print(f"Swing {s['index']}: {s['stroke']} ({s['hand']}-handed), contact at {s['times']['contact']:.2f}s [{s['contact_source']}]")
+        for m in s["metrics"]:
+            print(f"  {m['status']:5} {m['phase']:15} {m['label']}: {m['value']} {m['unit']}")
+    print(f"Report: {args.out}/report.json   Overlay: {args.out}/overlay.mp4")
+
+
+if __name__ == "__main__":
+    main()
