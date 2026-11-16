@@ -36,6 +36,17 @@ def track_racket(video_path: str, info: VideoInfo, analyzer, crop: tuple[int, in
             boxes[i] = best
         if progress and i % 10 == 0:
             progress(i / max(n, 1))
+    # throw out detections that disagree with the ones either side of them (the detector boxed something else)
+    offsets = np.column_stack([(boxes[:, 0] + boxes[:, 2]) / 2, (boxes[:, 1] + boxes[:, 3]) / 2]) - wrist
+    idx = np.where(~np.isnan(boxes[:, 0]))[0]
+    limit = 0.25 / analyzer.m_per_px
+    for j in range(1, len(idx) - 1):
+        p, i, q = idx[j - 1], idx[j], idx[j + 1]
+        if i - p > 12 or q - i > 12:
+            continue
+        to_prev, to_next = np.linalg.norm(offsets[i] - offsets[p]), np.linalg.norm(offsets[i] - offsets[q])
+        if to_prev > limit and to_next > limit and np.linalg.norm(offsets[p] - offsets[q]) < min(to_prev, to_next):
+            boxes[i] = np.nan
     seen = ~np.isnan(boxes[:, 0])
     filled = boxes.copy()
     idx = np.where(seen)[0]

@@ -147,13 +147,18 @@ class SwingAnalyzer:
         speed = np.full(len(head), np.nan)
         if ok.sum() >= 5:
             idx = np.where(ok)[0]
+            # a 5-frame median removes single-frame jumps when the detector briefly boxes something else
+            for c in range(2):
+                vals = head[idx, c]
+                padded = np.pad(vals, 2, mode="edge")
+                head[idx, c] = np.median(np.lib.stride_tricks.sliding_window_view(padded, 5), axis=1)
             for a, b in zip(idx[:-1], idx[1:]):
                 if b - a == 1:
                     speed[b] = np.linalg.norm(head[b] - head[a]) / max(self.t[b] - self.t[a], 1e-3) * self.m_per_px
             good = ~np.isnan(speed)
             if good.sum() >= 5:
                 smooth = speed.copy()
-                smooth[good] = _smooth(speed[good], self.fps, 0.07)
+                smooth[good] = np.maximum(_smooth(speed[good], self.fps, 0.07), 0.0)
                 speed = smooth
         self.racket_speed = speed
 
@@ -357,7 +362,7 @@ class SwingAnalyzer:
         tol = max(2, int(round(0.035 * fps)))   # frame-rate limit on what order can be resolved
         chain = [pel_i, sho_i, max(arm_i, fore_i)]
         worst = max(chain[0] - chain[1], chain[1] - chain[2])
-        order = "in order" if worst <= 0 else "in order (within frame-rate limits)" if worst <= tol else "out of order"
+        order = "in order" if worst <= tol else "out of order"
         add("sequence", "Kinetic chain order (hips, shoulders, arm)", order, "", "Forward swing",
             typical="hips peak first, arm last", status="work" if worst > tol else "good",
             note="Each segment should reach top speed after the one below it. Higher frame rates (120/240 fps) resolve this better.")
