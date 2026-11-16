@@ -6,21 +6,21 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Tracer Tennis">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" content="#0a1230">
+<meta name="theme-color" content="#060f2b">
 <link rel="manifest" href="/static/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/static/icon-180.png">
 <link rel="icon" type="image/png" href="/static/icon-192.png">
 <title>Tracer Tennis</title>
 <style>
 :root {
-  --bg: #f5f7fc; --card: #ffffff; --ink: #0a1230; --muted: #56607a; --line: #dce2ef;
-  --accent: #1769ff; --accent-ink: #ffffff; --good: #12855a; --ok: #b7791f; --work: #c2410c; --info: #64748b;
-  --chip: #e7ecf8; --court: #2f6b4a; --court-line: #f5f7f2; --head: #0a1230; --head-ink: #ffffff; --head-link: #8fbaff;
+  --bg: #f6f8fd; --card: #ffffff; --ink: #060f2b; --muted: #56607a; --line: #dce2ef;
+  --accent: #005efd; --accent-ink: #ffffff; --good: #12855a; --ok: #b7791f; --work: #c2410c; --info: #64748b;
+  --chip: #e7ecf8; --court: #2f6b4a; --court-line: #f5f7f2; --head: #060f2b; --head-ink: #ffffff; --head-link: #8fbaff;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #060b1f; --card: #0f1836; --ink: #eef2fb; --muted: #9aa6c4; --line: #1f2a4d;
-    --accent: #3d8bff; --accent-ink: #04102b; --good: #3ecf8e; --ok: #e3b34f; --work: #ff8a5c; --info: #94a3b8;
+    --bg: #060f2b; --card: #0e1a40; --ink: #eef2fb; --muted: #9aa6c4; --line: #1f2d57;
+    --accent: #2f7dff; --accent-ink: #ffffff; --good: #3ecf8e; --ok: #e3b34f; --work: #ff8a5c; --info: #94a3b8;
     --chip: #18234a; --court: #265c40; --court-line: #dfe8e1;
   }
 }
@@ -29,12 +29,10 @@ html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
 header { position: sticky; top: 0; z-index: 5; background: var(--head); border-bottom: 1px solid var(--line);
   padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: center; justify-content: space-between; }
-header a.brand { display: flex; align-items: center; gap: 8px; color: var(--head-ink); text-decoration: none; }
-header a.brand img { width: 34px; height: 34px; display: block; }
-header a.brand .word { display: flex; flex-direction: column; line-height: 1; }
-header a.brand .word b { font-size: 16px; font-weight: 800; letter-spacing: 0.12em; font-style: italic; }
-header a.brand .word span { font-size: 9.5px; font-weight: 700; letter-spacing: 0.42em; color: var(--head-link); margin-top: 3px; }
-header nav a { color: var(--head-link); text-decoration: none; font-weight: 600; margin-left: 14px; font-size: 15px; }
+header a.brand { display: flex; align-items: center; gap: 6px; text-decoration: none; }
+header a.brand img { display: block; height: 34px; width: auto; }
+header a.brand img.word { height: 30px; }
+header nav a { color: var(--head-link); text-decoration: none; font-weight: 600; margin-left: 12px; font-size: 15px; }
 main { max-width: 760px; margin: 0 auto; padding: 16px 16px calc(40px + env(safe-area-inset-bottom)); }
 h1 { font-size: 24px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 h2 { font-size: 18px; margin: 28px 0 10px; letter-spacing: -0.01em; }
@@ -100,7 +98,7 @@ svg { display: block; width: 100%; height: auto; }
 </head>
 <body>
 <header>
-  <a class="brand" href="#/" aria-label="Tracer Tennis home"><img src="/static/logo-mark.svg" alt=""><span class="word"><b>TRACER</b><span>TENNIS</span></span></a>
+  <a class="brand" href="#/" aria-label="Tracer Tennis home"><img src="/static/logo-mark.png" alt="" width="48" height="34"><img class="word" src="/static/wordmark.png" alt="Tracer Tennis" width="121" height="30"></a>
   <nav><a href="#/new/swing">Swing</a><a href="#/new/lesson">Lesson</a><a href="#/new/match">Match</a></nav>
 </header>
 <main id="view"></main>

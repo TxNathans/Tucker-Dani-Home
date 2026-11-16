@@ -47,9 +47,9 @@ anywhere while the computer is on. The alternative is to run this on a rented cl
 **Who can reach it.** There is no login. Anyone on the same Wi-Fi who knows the address can upload videos and see
 reports, so run it on a home network, not a public one.
 
-**Icon.** The app icon is a redraw of the Tracer Tennis mark (`app/static/logo-mark.svg`). To use the original
-artwork instead, run `python -m app.icons path/to/app-icon.png` with a square image of the icon; it writes the
-three sizes the home screen uses.
+**Icon.** The icon, logo mark and wordmark in `app/static` are cut from the Tracer Tennis brand sheet. To change
+the icon, run `python -m app.icons path/to/app-icon.png` with a square image; it writes the three sizes the home
+screen uses.
 
 Developer start, without the launcher: `pip install -r requirements.txt` then `python -m app.server`.
 
