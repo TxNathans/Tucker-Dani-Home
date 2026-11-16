@@ -123,7 +123,7 @@ svg { display: block; width: 100%; height: auto; }
 .homehero { background: var(--hero); color: #fff; border-radius: 22px; padding: 22px 20px; margin: 2px 0 16px; box-shadow: var(--shadow); }
 .homehero h1 { color: #fff; font-size: 26px; }
 .homehero p { color: #c3d3f5; max-width: 34ch; }
-.mode { display: flex; gap: 14px; align-items: center; }
+a.card.mode { display: flex; gap: 14px; align-items: center; }
 .mode .ico { width: 46px; height: 46px; flex: 0 0 46px; border-radius: 14px; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; }
 .mode .ico svg { width: 26px; height: 26px; }
 .mode .txt { flex: 1; min-width: 0; }
@@ -442,30 +442,46 @@ function scoreRing(score) {
     <div class="num"><b>${score}</b><span>out of 100</span></div></div>`;
 }
 
-function birdsEye(td, which, status) {
-  // Looking straight down. Up the page is toward the target; the chest faces the right-hand side of the page.
-  const f = td[which], S = 150, W = 340, H = 300;
-  const feet = f.feet, mid = [(feet[0].pos[0] + feet[1].pos[0]) / 2, (feet[0].pos[1] + feet[1].pos[1]) / 2];
-  const X = x => W / 2 + (x - mid[0]) * S, Y = y => H / 2 + 14 - (y - mid[1]) * S;
+function birdsEye(td, which, status, byKey) {
+  // Schematic seen from straight above. Up the page is toward the target; the chest side is to the right.
+  const f = td[which], S = 175, W = 340, H = 330;
+  const mid = [(f.feet[0].pos[0] + f.feet[1].pos[0]) / 2, (f.feet[0].pos[1] + f.feet[1].pos[1]) / 2];
+  const gap = Math.hypot(f.feet[0].pos[0] - f.feet[1].pos[0], f.feet[0].pos[1] - f.feet[1].pos[1]);
+  const spread = gap < 0.42 ? 0.42 / Math.max(gap, 0.05) : 1;      // keep the two shoes from overlapping when the feet are close
+  const feet = f.feet.map(ft => ({...ft, pos: [mid[0] + (ft.pos[0] - mid[0]) * spread, mid[1] + (ft.pos[1] - mid[1]) * spread]}));
+  const X = x => W / 2 + 10 + (x - mid[0]) * S, Y = y => H / 2 + 20 - (y - mid[1]) * S;
   const col = k => `var(--${({good: 'good', ok: 'ok', work: 'work'})[status[k]] || 'info'})`;
-  const footShape = ft => {
+  const num = k => byKey[k] && typeof byKey[k].value === 'number' ? byKey[k].value : null;
+  const shoe = ft => {
     const key = ft.front ? 'front_foot_angle' : (which === 'set' ? 'back_foot_angle' : 'back_foot_pivot');
-    const ang = Math.atan2(ft.dir[0], ft.dir[1]) * 180 / Math.PI, cx = X(ft.pos[0] + ft.dir[0] * 0.07), cy = Y(ft.pos[1] + ft.dir[1] * 0.07);
-    return `<g transform="translate(${cx.toFixed(1)} ${cy.toFixed(1)}) rotate(${ang.toFixed(1)})">
-      <rect x="-9" y="-22" width="18" height="44" rx="9" fill="${col(key)}"/><path d="M0 -34 L7 -24 H-7 Z" fill="${col(key)}"/></g>
-      <text x="${(cx + (ft.pos[0] < mid[0] ? -16 : 16)).toFixed(1)}" y="${(cy + 38).toFixed(1)}" font-size="11" font-weight="600" text-anchor="middle" fill="currentColor" opacity=".75">${ft.front ? 'front foot' : 'back foot'}</text>`;
+    const deg = Math.atan2(ft.dir[0], ft.dir[1]) * 180 / Math.PI, cx = X(ft.pos[0]), cy = Y(ft.pos[1]);
+    const off = Math.round(Math.acos(Math.max(-1, Math.min(1, ft.dir[1]))) * 180 / Math.PI);
+    const left = ft.pos[0] < mid[0] || (ft.pos[0] === mid[0] && !ft.front);
+    return `<g transform="translate(${cx.toFixed(1)} ${cy.toFixed(1)}) rotate(${deg.toFixed(1)}) scale(.78)">
+        <path d="M-12 26 Q-14 -6 -9 -24 Q0 -40 9 -24 Q14 -6 12 26 Q0 33 -12 26 Z" fill="${col(key)}"/>
+        <path d="M-7 -22 Q0 -33 7 -22" fill="none" stroke="#fff" stroke-opacity=".85" stroke-width="2.5" stroke-linecap="round"/></g>
+      <text x="${(cx + (left ? -22 : 22)).toFixed(1)}" y="${(cy + 4).toFixed(1)}" font-size="11.5" font-weight="700" text-anchor="${left ? 'end' : 'start'}" fill="currentColor">${ft.front ? 'Front foot' : 'Back foot'}</text>
+      <text x="${(cx + (left ? -22 : 22)).toFixed(1)}" y="${(cy + 19).toFixed(1)}" font-size="11" text-anchor="${left ? 'end' : 'start'}" fill="currentColor" opacity=".7">${off}° off target</text>`;
   };
-  const seg = (pts, w, op) => `<line x1="${X(pts[0][0])}" y1="${Y(pts[0][1])}" x2="${X(pts[1][0])}" y2="${Y(pts[1][1])}" stroke="currentColor" stroke-opacity="${op}" stroke-width="${w}" stroke-linecap="round"/>`;
-  const hx = X(f.hand[0]), hy = Y(f.hand[1]);
-  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="feet, hips, shoulders and hand seen from above" style="max-width:360px;margin:0 auto">
-    <line x1="30" y1="${H - 24}" x2="30" y2="34" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="5 5"/><path d="M30 18 L38 34 H22 Z" fill="var(--accent)"/>
-    <text x="44" y="30" font-size="11.5" font-weight="700" fill="var(--accent)">target</text>
-    ${seg(f.hips, 9, .28)}${seg(f.shoulders, 6, .7)}
-    <text x="${X(f.shoulders[0][0]) + 8}" y="${Y(f.shoulders[0][1]) - 8}" font-size="11" font-weight="600" fill="currentColor" opacity=".75">shoulders</text>
-    ${feet.map(footShape).join('')}
-    <circle cx="${hx}" cy="${hy}" r="7" fill="var(--accent)"/>
-    ${which === 'contact' ? `<circle cx="${hx + 2}" cy="${hy - 22}" r="8" fill="#d8ee3a" stroke="#7d8f00" stroke-width="1"/><text x="${hx + 16}" y="${hy - 18}" font-size="11" font-weight="600" fill="currentColor" opacity=".75">contact</text>`
-      : `<text x="${hx + 12}" y="${hy + 4}" font-size="11" font-weight="600" fill="currentColor" opacity=".75">hitting hand</text>`}
+  const turn = num(which === 'set' ? 'shoulder_turn' : 'shoulders_at_contact');
+  let chest = '';
+  if (turn !== null) {
+    const a = turn * Math.PI / 180, nx = Math.sin(a), ny = Math.cos(a), cx = X(mid[0]), cy = Y(mid[1] + 0.03), half = 36;
+    chest = `<line x1="${cx - ny * half}" y1="${cy - nx * half}" x2="${cx + ny * half}" y2="${cy + nx * half}" stroke="currentColor" stroke-opacity=".8" stroke-width="7" stroke-linecap="round"/>
+      <line x1="${cx}" y1="${cy}" x2="${cx + nx * 26}" y2="${cy - ny * 26}" stroke="currentColor" stroke-opacity=".8" stroke-width="3" stroke-linecap="round"/>
+      <text x="${cx + nx * 34 + (nx >= 0 ? 2 : -2)}" y="${cy - ny * 34 + 4}" font-size="11" font-weight="600" text-anchor="${nx >= 0.3 ? 'start' : nx <= -0.3 ? 'end' : 'middle'}" fill="currentColor" opacity=".75">chest</text>`;
+  }
+  let ball = '';
+  const ahead = num('contact_in_front'), spacing = num('contact_spacing');
+  if (which === 'contact' && ahead !== null && spacing !== null) {
+    const front = feet.find(x => x.front), bx = X(Math.max(mid[0] + spacing / 100, front.pos[0] + 0.24)), by = Y(mid[1] + (front.pos[1] - mid[1]) * 0.5 + ahead / 100);
+    ball = `<circle cx="${bx}" cy="${by}" r="9" fill="#d8ee3a" stroke="#7d8f00" stroke-width="1.2"/>
+      <text x="${bx}" y="${by - 15}" font-size="11.5" font-weight="700" text-anchor="middle" fill="currentColor">Contact</text>`;
+  }
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="feet, chest and contact point seen from above" style="max-width:360px;margin:0 auto">
+    <line x1="26" y1="${H - 20}" x2="26" y2="36" stroke="var(--accent)" stroke-width="2.5" stroke-dasharray="5 5"/><path d="M26 18 L34 36 H18 Z" fill="var(--accent)"/>
+    <text x="40" y="31" font-size="11.5" font-weight="700" fill="var(--accent)">To target</text>
+    ${chest}${feet.map(shoe).join('')}${ball}
   </svg>`;
 }
 
@@ -498,7 +514,7 @@ function swingReport(job) {
     const racket = r.series.racket_head_speed;
     const series = [{name: 'Hand (mph)', color: '#3d86ff', t: r.series.t, y: r.series.hand_speed.map(v => v * MPH)}];
     if (racket) series.push({name: 'Racket head (mph)', color: '#f2a93b', t: r.series.t, y: racket.map(v => v === null ? null : v * MPH)});
-    const marks = [['backswing_end', 'racket back'], ['contact', 'contact'], ['finish', 'finish']].map(([k, label]) => ({t: s.times[k], label}));
+    const marks = [['backswing_end', 'racket back'], ['contact', 'contact']].map(([k, label]) => ({t: s.times[k], label}));
     const seqMax = Math.max(...s.sequence.map(q => Math.abs(q.ms_before_contact)), 1);
     const strokeName = s.stroke[0].toUpperCase() + s.stroke.slice(1) + (s.two_handed ? ', two-handed' : '');
     const phases = [...new Set(s.metrics.map(m => m.phase))];
@@ -533,7 +549,7 @@ function swingReport(job) {
         <div class="card"><div class="seg" id="eye"><button data-eye="set" class="${eye === 'set' ? 'on' : ''}">Racket back</button><button data-eye="contact" class="${eye === 'contact' ? 'on' : ''}">Contact</button></div>
           <div id="eyeSvg" style="margin-top:8px"></div>
           <p><b>${stance ? esc(stance.value[0].toUpperCase() + stance.value.slice(1)) + ' stance.' : ''}</b> ${stance ? esc(stance.note) : ''}${step && typeof step.value === 'number' && step.value >= 8 ? ` You stepped ${Math.round(step.value / 2.54)} inches toward the target.` : ''}</p>
-          <p class="small muted">Drawn from one camera, so treat positions as approximate. The arrow tips show where the toes point.</p></div>` : ''}
+          <p class="small muted">A simplified picture built from the measured angles. Green means in a good range; amber or red needs attention.</p></div>` : ''}
 
       ${c && c.strengths.length ? `<h2>What you did well</h2><div class="card"><ul class="wins">${c.strengths.map((w, i) => `<li class="${i >= 6 ? 'coachonly' : ''}"><span class="tick" aria-hidden="true">✓</span><span>${esc(w.text)}</span></li>`).join('')}</ul></div>` : ''}
 
@@ -560,7 +576,7 @@ function swingReport(job) {
     document.querySelectorAll('.pickswing').forEach(b => b.addEventListener('click', () => { current = +b.dataset.i; draw(); window.scrollTo(0, 0); }));
     requestAnimationFrame(() => document.querySelectorAll('.ring circle.fill').forEach(el => el.setAttribute('stroke-dashoffset', el.dataset.to)));
     if (s.topdown && s.topdown.contact) {
-      const paint = () => { $('#eyeSvg').innerHTML = birdsEye(s.topdown, eye, status); document.querySelectorAll('#eye button').forEach(b => b.classList.toggle('on', b.dataset.eye === eye)); };
+      const paint = () => { $('#eyeSvg').innerHTML = birdsEye(s.topdown, eye, status, byKey); document.querySelectorAll('#eye button').forEach(b => b.classList.toggle('on', b.dataset.eye === eye)); };
       $('#eye').addEventListener('click', ev => { if (ev.target.dataset.eye) { eye = ev.target.dataset.eye; paint(); } });
       paint();
     }
@@ -679,7 +695,7 @@ function matchReport(job) {
       ${ra.shots.map(s => `<div class="shot" data-seek="${Math.max(0, s.t - 1).toFixed(2)}"><span class="t">${s.t.toFixed(1)}s</span><span class="dot" style="background:${color[s.player]}"></span>
         <div style="flex:1"><b>${esc(s.name)}</b> ${shotLabel(s)}
           ${s.unsure_player ? '<span class="chip warn">check player</span>' : ''}
-          ${s.mocap ? `<div class="small muted">${mocapLine(s.mocap.metrics)}</div>` : ''}</div>
+          ${s.mocap ? `<div class="small muted">${mocapLine(s.mocap.metrics)}</div>${s.mocap.tip ? `<div class="small"><b>Fix:</b> ${esc(s.mocap.tip.title)}. <span class="muted">${esc(s.mocap.tip.cue)}</span></div>` : ''}` : ''}</div>
         <span class="small">${r.lesson ? (s.result === 'unknown' ? '' : `<b>${s.result === 'in' ? 'in' : nice(s.result)}</b>`) : (s.result === 'in' || s.result === 'unknown' ? '' : nice(s.result))} ${s.speed_kmh ? Math.round(s.speed_kmh * 0.621) + ' mph' : ''}</span></div>`).join('')}`).join('')
       : '<p class="muted">No shots were detected.</p>'}
       <p class="small muted">Tap a shot to jump the video to it.</p></div>

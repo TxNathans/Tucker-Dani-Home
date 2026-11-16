@@ -164,7 +164,9 @@ def shot_mocap(video_path: str, info, t_hit: float, boxes_src: np.ndarray, hand:
         return None
     peak = min(near, key=lambda p: abs(seq.t[p] - t_hit))
     swing = analyzer.analyze_swing(1, peak, 0, len(seq.t) - 1)
-    out = dict(stroke=swing.stroke, two_handed=swing.two_handed,
+    fixes = swing.coaching.get("fixes", [])
+    tip = dict(title=fixes[0]["title"], cue=fixes[0]["cue"]) if fixes and fixes[0]["severity"] == "fix" else None
+    out = dict(stroke=swing.stroke, two_handed=swing.two_handed, score=swing.coaching.get("overall"), tip=tip,
                metrics={m.key: dict(label=m.label, value=m.value, unit=m.unit, status=m.status, typical=m.typical)
                         for m in swing.metrics if m.key in MOCAP_KEYS})
     if keyframe_path:

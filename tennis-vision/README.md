@@ -5,9 +5,11 @@ Film tennis on an iPhone, upload the video, get back motion capture of the swing
 Three modes:
 
 - **Swing analysis.** One player, one or more swings. Tracks 33 body landmarks and the racket, times the swing
-  phases, finds contact from hand speed plus the sound of the hit, and measures joint angles, rotation, the
-  kinetic chain, hand speed and estimated racket-head speed. Output: a skeleton-overlay video, key frames, and
-  strengths / work-on points with typical ranges.
+  phases, and finds contact from hand speed plus the sound of the hit. It reads the feet (stance, where each foot
+  points, the step into the ball, the back-foot release) and how well the swing works through the ball (extension
+  toward the target after contact, speed kept past the ball, weight moving forward). The report gives a score, the
+  fixes in priority order, and a Player view and a Coach view: each fix says what was seen, why it matters, one
+  cue, one drill, and (for coaches) the measurement and typical range.
 - **Match or session.** Singles or doubles. Tracks each player (told apart by clothing), the ball, the rackets and
   every hit and bounce. If the camera is fixed and you mark the four court corners, it also gives landing spots,
   in/out, shot speed, serve placement, scoring, the full stat sheet, positioning (where each player stands when
