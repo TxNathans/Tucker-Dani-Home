@@ -94,8 +94,9 @@ def _contact(index: int, hit: Hit, bounced_before: bool) -> tuple[str, str]:
     stroke = hit.stroke if hit.stroke in ("forehand", "backhand") else "unknown"
     if hit.above_head and index > 0:
         return (stroke if stroke != "unknown" else "forehand"), "overhead"
-    if index > 0 and not bounced_before:
-        return stroke, "volley"
+    forward = hit.pos is None or abs(hit.pos[1]) < HALF_LENGTH - 2.5
+    if index > 0 and not bounced_before and forward:
+        return stroke, "volley"                # from the back of the court a missed bounce is likelier than a volley
     return stroke, "groundstroke"
 
 

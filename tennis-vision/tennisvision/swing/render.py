@@ -12,6 +12,7 @@ LEFT_COLOR = (255, 170, 60)     # BGR: blue-ish for the left side
 RIGHT_COLOR = (60, 200, 255)    # amber for the right side
 MID_COLOR = (235, 235, 235)
 TRAIL_COLOR = (80, 255, 160)
+RACKET_COLOR = (255, 80, 255)
 PHASE_LABELS = [("takeback", "Takeback"), ("backswing_end", "Backswing set"), ("forward_swing", "Forward swing"),
                 ("contact", "Contact"), ("finish", "Follow-through")]
 
@@ -109,6 +110,18 @@ def render_overlay(video_path: str, out_path: str, an: SwingAnalyzer, swings: li
                 alpha = k / len(trail)
                 cv2.line(img, tuple(np.int32(trail[k - 1])), tuple(np.int32(trail[k])),
                          tuple(int(c * alpha) for c in TRAIL_COLOR), max(1, int(thick * 1.5 * alpha)), cv2.LINE_AA)
+            if an.racket is not None and an.racket["valid"][i]:
+                rb = (an.racket["boxes"][i] - (x0, y0, x0, y0)) * scale
+                color = RACKET_COLOR if an.racket["seen"][i] else (150, 90, 150)
+                cv2.rectangle(img, (int(rb[0]), int(rb[1])), (int(rb[2]), int(rb[3])), color, 1, cv2.LINE_AA)
+                heads = (an.racket["head"][lo:i + 1] - (x0, y0)) * scale
+                ok = an.racket["valid"][lo:i + 1]
+                for k in range(1, len(heads)):
+                    if ok[k] and ok[k - 1]:
+                        alpha = k / len(heads)
+                        cv2.line(img, tuple(np.int32(heads[k - 1])), tuple(np.int32(heads[k])),
+                                 tuple(int(c * alpha) for c in RACKET_COLOR), max(1, int(thick * 1.5 * alpha)), cv2.LINE_AA)
+                cv2.circle(img, tuple(np.int32(heads[-1])), thick + 3, RACKET_COLOR, 2, cv2.LINE_AA)
             draw_skeleton(img, pts, seq.vis[i] if seq.detected[i] else np.ones(33), thick)
             _angle_label(img, pts, d["sh"], d["el"], d["wr"], elbow[i])
             _angle_label(img, pts, d["hip"], d["kn"], d["an"], knee[i])
@@ -117,7 +130,10 @@ def render_overlay(video_path: str, out_path: str, an: SwingAnalyzer, swings: li
                 is_contact = any(i == s.frames["contact"] for s in swings)
                 _chip(img, phase, (12, 12), 0.7, bg=(40, 40, 220) if is_contact else (30, 30, 30))
             cv2.rectangle(img, (0, oh - 44), (ow, oh), (20, 20, 20), -1)
-            readout = f"hand {an.hand_speed[i]:4.1f} m/s   elbow {elbow[i]:3.0f}   knee {knee[i]:3.0f}   t {an.t[i]:.2f}s"
+            racket_txt = ""
+            if an.racket_speed is not None and np.isfinite(an.racket_speed[i]):
+                racket_txt = f"racket {an.racket_speed[i]:4.1f}   "
+            readout = f"hand {an.hand_speed[i]:4.1f} m/s   {racket_txt}elbow {elbow[i]:3.0f}   knee {knee[i]:3.0f}   t {an.t[i]:.2f}s"
             cv2.putText(img, readout, (12, oh - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 1, cv2.LINE_AA)
             writer.write(img)
             if keyframe_dir and i in wanted:

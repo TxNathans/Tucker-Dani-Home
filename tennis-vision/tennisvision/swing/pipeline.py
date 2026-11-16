@@ -9,13 +9,14 @@ from pathlib import Path
 from ..pose import extract_pose
 from ..video import probe, read_audio
 from .analyze import SwingAnalyzer, session_summary
-from .render import render_overlay
+from .racket import track_racket
+from .render import crop_box, render_overlay
 
 AUDIO_RATE = 16000
 
 
 def analyze_video(video_path: str, out_dir: str, height_m: float = 1.70, handedness: str = "auto",
-                  model: str = "heavy", progress=None) -> dict:
+                  model: str = "heavy", track_rackets: bool = True, progress=None) -> dict:
     out = Path(out_dir)
     out.mkdir(parents=True, exist_ok=True)
     step = lambda lo, hi: (lambda f: progress(lo + (hi - lo) * f)) if progress else None
@@ -26,15 +27,20 @@ def analyze_video(video_path: str, out_dir: str, height_m: float = 1.70, handedn
         raise ValueError("Could not find a player in most frames. Film so the whole body is visible.")
     audio = read_audio(video_path, AUDIO_RATE) if info.has_audio else None
     analyzer = SwingAnalyzer(seq, height_m, handedness, audio, AUDIO_RATE)
+    if track_rackets:
+        racket = track_racket(video_path, info, analyzer, crop_box(analyzer, margin=0.9), progress=step(0.6, 0.8))
+        if racket["seen"].mean() > 0.15:
+            analyzer.set_racket(racket)
     swings = analyzer.analyze()
     keyframes = render_overlay(video_path, str(out / "overlay.mp4"), analyzer, swings, info,
-                               keyframe_dir=str(out), progress=step(0.6, 1.0))
+                               keyframe_dir=str(out), progress=step(0.8, 1.0))
     report = dict(
         kind="swing",
         video=dict(width=info.width, height=info.height, fps=round(info.fps, 2), duration=round(info.duration, 2),
                    frames=info.n_frames, pose_frames_detected=int(seq.detected.sum())),
         player=dict(height_m=height_m, hand=analyzer.hand, metres_per_pixel=round(analyzer.m_per_px, 5),
-                    camera_distance_m=round(analyzer.distance_m, 1)),
+                    camera_distance_m=round(analyzer.distance_m, 1),
+                    racket_seen_pct=round(100 * float(analyzer.racket["seen"].mean())) if analyzer.racket else None),
         swings=[asdict(s) for s in swings],
         summary=session_summary(swings),
         keyframes=keyframes,

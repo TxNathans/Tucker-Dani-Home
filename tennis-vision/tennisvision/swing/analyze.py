@@ -136,6 +136,26 @@ class SwingAnalyzer:
         self.upper_arm_vel = _segment_angular_speed(self.world, self.dom["sh"], self.dom["el"], self.dt)
         self.forearm_vel = _segment_angular_speed(self.world, self.dom["el"], self.dom["wr"], self.dt)
         self.ground_y = self._ground_line()
+        self.racket = None
+        self.racket_speed = None
+
+    def set_racket(self, racket: dict) -> None:
+        """Attach racket tracking (see swing.racket.track_racket) so racket-head metrics are reported."""
+        self.racket = racket
+        head = racket["head"].copy()
+        ok = racket["valid"]
+        speed = np.full(len(head), np.nan)
+        if ok.sum() >= 5:
+            idx = np.where(ok)[0]
+            for a, b in zip(idx[:-1], idx[1:]):
+                if b - a == 1:
+                    speed[b] = np.linalg.norm(head[b] - head[a]) / max(self.t[b] - self.t[a], 1e-3) * self.m_per_px
+            good = ~np.isnan(speed)
+            if good.sum() >= 5:
+                smooth = speed.copy()
+                smooth[good] = _smooth(speed[good], self.fps, 0.07)
+                speed = smooth
+        self.racket_speed = speed
 
     # ---- calibration -------------------------------------------------------
     def _scale(self) -> float:
@@ -348,6 +368,26 @@ class SwingAnalyzer:
         add("hand_speed_contact", "Hand speed at contact", round(float(self.hand_speed[contact]), 1), "m/s", "Contact",
             status="good" if self.hand_speed[contact] >= 0.9 * hand_v else "ok",
             note="Should still be near peak: accelerating through the ball, not slowing into it.")
+        if self.racket is not None and self.racket_speed is not None:
+            seg = self.racket_speed[fwd:min(contact + 3, len(t))]
+            seen_pct = round(100 * float(self.racket["seen"][back:finish + 1].mean()))
+            if np.isfinite(seg).sum() >= 3:
+                head_peak = float(np.nanmax(seg))
+                add("racket_head_speed", "Racket-head speed, peak (estimate)", round(head_peak, 1), "m/s", "Forward swing",
+                    typical="25-35 m/s for a strong club forehand",
+                    note=f"{head_peak * 2.237:.0f} mph across the camera view. Racket seen in {seen_pct}% of swing frames; "
+                         "fast frames blur, so treat this as a floor.")
+                head_y = self.racket["head"][:, 1]
+                window_y = head_y[back:contact + 1]
+                if np.isfinite(window_y).any() and np.isfinite(head_y[contact]):
+                    drop = float((np.nanmax(window_y) - head_y[contact]) * self.m_per_px * 100)
+                    if stroke != "serve/overhead":
+                        add("racket_drop", "Racket head drop below contact height", round(drop), "cm", "Forward swing", typical="20-50",
+                            status="good" if drop >= 20 else "ok" if drop >= 8 else "work",
+                            note="How far the racket head gets under the ball before swinging up. This is where topspin comes from.")
+            else:
+                add("racket_head_speed", "Racket-head speed, peak (estimate)", None, "m/s", "Forward swing",
+                    note=f"Racket seen in only {seen_pct}% of swing frames. Film at 120 or 240 fps for a sharper racket.")
         a, b = max(contact - 2, 0), min(contact + 2, len(t) - 1)
         dxy = xy[b, d["wr"]] - xy[a, d["wr"]]
         path_angle = float(np.degrees(np.arctan2(-dxy[1], abs(dxy[0]) + 1e-9)))
@@ -458,6 +498,7 @@ class SwingAnalyzer:
         return dict(
             t=r(self.t, 3), hand_speed=r(self.hand_speed, 2),
             hip_rotation_speed=r(np.abs(self.pelvis_vel), 0), shoulder_rotation_speed=r(np.abs(self.shoulder_vel), 0),
+            racket_head_speed=[None if not np.isfinite(v) else round(float(v), 1) for v in self.racket_speed] if self.racket_speed is not None else None,
             elbow=r(_angle(w[:, d["sh"]], w[:, d["el"]], w[:, d["wr"]]), 0),
             knee=r(_angle(w[:, d["hip"]], w[:, d["kn"]], w[:, d["an"]]), 0),
             separation=r(self.shoulder_angle - self.pelvis_angle, 0),
@@ -472,7 +513,7 @@ def session_summary(swings: list[Swing]) -> dict:
     out = {}
     for stroke, group in by_stroke.items():
         rows = {}
-        for key in ("hand_speed_peak", "swing_path", "elbow_contact", "contact_height", "contact_in_front", "knee_bend_dom",
+        for key in ("hand_speed_peak", "racket_head_speed", "racket_drop", "swing_path", "elbow_contact", "contact_height", "contact_in_front", "knee_bend_dom",
                     "separation", "head_stability", "forward_swing_time"):
             vals = [s.metric(key) for s in group if isinstance(s.metric(key), (int, float))]
             if vals:
