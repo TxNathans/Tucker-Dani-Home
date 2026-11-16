@@ -4,6 +4,8 @@ opencv-python-headless
 mediapipe
 onnxruntime
 gdown
+segno
+static-ffmpeg    # fetches ffmpeg/ffprobe once if they are not installed
 fastapi
 uvicorn[standard]
 python-multipart

@@ -53,3 +53,19 @@ def test_files_cannot_escape_the_job_folder(client):
     assert client.get(f"/files/{job_id}/..%2F..%2Fserver.py").status_code == 404
     assert client.get("/files/not-a-job/report.json").status_code == 404
     assert client.get("/api/jobs/0123456789ab").status_code == 404
+
+
+def test_phone_access_info_qr_and_home_screen_files(client, monkeypatch):
+    monkeypatch.setattr(server, "lan_addresses", lambda: ["192.168.1.23"])
+    monkeypatch.setattr(server, "PORT", 8000)
+    assert client.get("/api/info").json()["urls"] == ["http://192.168.1.23:8000"]
+    qr = client.get("/api/qr")
+    assert qr.status_code == 200 and qr.headers["content-type"].startswith("image/svg") and b"<svg" in qr.content
+    manifest = client.get("/static/manifest.webmanifest").json()
+    assert manifest["display"] == "standalone" and manifest["start_url"] == "/"
+    for icon in manifest["icons"] + [{"src": "/static/icon-180.png"}]:
+        assert client.get(icon["src"]).status_code == 200
+    page = client.get("/").text
+    assert 'rel="manifest"' in page and 'rel="apple-touch-icon"' in page
+    monkeypatch.setattr(server, "lan_addresses", lambda: [])
+    assert client.get("/api/qr").status_code == 404

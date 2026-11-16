@@ -66,6 +66,8 @@ def main() -> None:
     ap.add_argument("--hand", default="auto", choices=["auto", "right", "left"])
     ap.add_argument("--model", default="heavy", choices=["lite", "full", "heavy"])
     args = ap.parse_args()
+    from .. import ensure_ffmpeg
+    ensure_ffmpeg()
     report = analyze_video(args.video, args.out, args.height, args.hand, args.model)
     for s in report["swings"]:
         print(f"Swing {s['index']}: {s['stroke']} ({s['hand']}-handed), contact at {s['times']['contact']:.2f}s [{s['contact_source']}]")

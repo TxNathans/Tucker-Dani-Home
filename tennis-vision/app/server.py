@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import socket
 import threading
 import time
 import traceback
@@ -15,7 +16,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT.parent / "data" / "jobs"
@@ -23,7 +25,9 @@ DATA.mkdir(parents=True, exist_ok=True)
 ID_RE = re.compile(r"^[0-9a-f]{12}$")
 FILE_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
-app = FastAPI(title="Tennis Vision")
+app = FastAPI(title="Tracer Tennis")
+app.mount("/static", StaticFiles(directory=ROOT / "static"), name="static")
+PORT = 8000
 worker = ThreadPoolExecutor(max_workers=1)          # one analysis at a time: the models use every core
 jobs: dict[str, dict] = {}
 lock = threading.Lock()
@@ -161,6 +165,43 @@ def get_file(job_id: str, name: str):
     return FileResponse(path)
 
 
+def lan_addresses() -> list[str]:
+    """IPv4 addresses other devices can use to reach this computer (home Wi-Fi first, then VPNs such as Tailscale)."""
+    found: list[str] = []
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        probe.connect(("10.255.255.255", 1))          # no packet is sent; this only picks the outgoing interface
+        found.append(probe.getsockname()[0])
+        probe.close()
+    except OSError:
+        pass
+    try:
+        for item in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            found.append(item[4][0])
+    except OSError:
+        pass
+    unique = [a for i, a in enumerate(found) if a not in found[:i] and not a.startswith("127.")]
+    return unique
+
+
+@app.get("/api/info")
+def info():
+    return dict(computer=socket.gethostname(), urls=[f"http://{a}:{PORT}" for a in lan_addresses()])
+
+
+@app.get("/api/qr")
+def qr():
+    """QR code for the first address a phone on the same network can open."""
+    import io
+    import segno
+    urls = info()["urls"]
+    if not urls:
+        raise HTTPException(404, "This computer has no network address")
+    buf = io.BytesIO()
+    segno.make(urls[0], error="m").save(buf, kind="svg", scale=6, border=2, dark="#14201a", light="#ffffff")
+    return Response(buf.getvalue(), media_type="image/svg+xml", headers={"Cache-Control": "no-store"})
+
+
 @app.get("/")
 def index():
     return FileResponse(ROOT / "static" / "index.html", headers={"Cache-Control": "no-cache"})
@@ -169,14 +210,49 @@ def index():
 load_jobs()
 
 
+def open_app_window(url: str) -> None:
+    """Open the app in its own window (Chrome or Edge app mode) or, failing that, the default browser."""
+    import os
+    import subprocess
+    import webbrowser
+    candidates = [
+        os.path.expandvars(r"%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"),
+        os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"),
+        os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        shutil.which("google-chrome") or "", shutil.which("chromium") or "",
+    ]
+    for exe in candidates:
+        if exe and Path(exe).is_file():
+            try:
+                subprocess.Popen([exe, f"--app={url}", "--window-size=460,900"])
+                return
+            except OSError:
+                continue
+    webbrowser.open(url)
+
+
 def main() -> None:
+    global PORT
     import argparse
     import uvicorn
+    from tennisvision import ensure_ffmpeg
     ap = argparse.ArgumentParser()
     ap.add_argument("--host", default="0.0.0.0")
     ap.add_argument("--port", type=int, default=8000)
+    ap.add_argument("--open", action="store_true", help="open the app in a window once the server is up")
     args = ap.parse_args()
-    uvicorn.run(app, host=args.host, port=args.port)
+    PORT = args.port
+    ensure_ffmpeg()
+    here = f"http://localhost:{PORT}"
+    print(f"\nTracer Tennis is running.\n  On this computer: {here}")
+    for url in info()["urls"]:
+        print(f"  On your iPhone (same Wi-Fi): {url}")
+    print("  Scan the QR code on the app's home page with the iPhone camera to open it there.\n", flush=True)
+    if args.open:
+        threading.Timer(1.5, open_app_window, args=(here,)).start()
+    uvicorn.run(app, host=args.host, port=PORT, log_level="warning")
 
 
 if __name__ == "__main__":

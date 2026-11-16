@@ -4,28 +4,37 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Tennis Vision">
-<title>Tennis Vision</title>
+<meta name="apple-mobile-web-app-title" content="Tracer Tennis">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0a1230">
+<link rel="manifest" href="/static/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/static/icon-180.png">
+<link rel="icon" type="image/png" href="/static/icon-192.png">
+<title>Tracer Tennis</title>
 <style>
 :root {
-  --bg: #f4f5f1; --card: #ffffff; --ink: #14201a; --muted: #5d6b63; --line: #dfe3db;
-  --accent: #1f7a4d; --accent-ink: #ffffff; --good: #1f8a4c; --ok: #b7791f; --work: #c2410c; --info: #64748b;
-  --chip: #e9ede6; --court: #2f6b4a; --court-line: #f5f7f2;
+  --bg: #f5f7fc; --card: #ffffff; --ink: #0a1230; --muted: #56607a; --line: #dce2ef;
+  --accent: #1769ff; --accent-ink: #ffffff; --good: #12855a; --ok: #b7791f; --work: #c2410c; --info: #64748b;
+  --chip: #e7ecf8; --court: #2f6b4a; --court-line: #f5f7f2; --head: #0a1230; --head-ink: #ffffff; --head-link: #8fbaff;
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f1512; --card: #18211c; --ink: #eef2ee; --muted: #9aa89f; --line: #2a362f;
-    --accent: #4ccb85; --accent-ink: #06150d; --good: #4ccb85; --ok: #e3b34f; --work: #ff8a5c; --info: #94a3b8;
-    --chip: #223029; --court: #265c40; --court-line: #dfe8e1;
+    --bg: #060b1f; --card: #0f1836; --ink: #eef2fb; --muted: #9aa6c4; --line: #1f2a4d;
+    --accent: #3d8bff; --accent-ink: #04102b; --good: #3ecf8e; --ok: #e3b34f; --work: #ff8a5c; --info: #94a3b8;
+    --chip: #18234a; --court: #265c40; --court-line: #dfe8e1;
   }
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
 body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line);
+header { position: sticky; top: 0; z-index: 5; background: var(--head); border-bottom: 1px solid var(--line);
   padding: calc(10px + env(safe-area-inset-top)) 16px 10px; display: flex; align-items: center; justify-content: space-between; }
-header a.brand { font-weight: 700; font-size: 18px; color: var(--ink); text-decoration: none; letter-spacing: -0.01em; }
-header nav a { color: var(--accent); text-decoration: none; font-weight: 600; margin-left: 14px; }
+header a.brand { display: flex; align-items: center; gap: 8px; color: var(--head-ink); text-decoration: none; }
+header a.brand img { width: 34px; height: 34px; display: block; }
+header a.brand .word { display: flex; flex-direction: column; line-height: 1; }
+header a.brand .word b { font-size: 16px; font-weight: 800; letter-spacing: 0.12em; font-style: italic; }
+header a.brand .word span { font-size: 9.5px; font-weight: 700; letter-spacing: 0.42em; color: var(--head-link); margin-top: 3px; }
+header nav a { color: var(--head-link); text-decoration: none; font-weight: 600; margin-left: 14px; font-size: 15px; }
 main { max-width: 760px; margin: 0 auto; padding: 16px 16px calc(40px + env(safe-area-inset-bottom)); }
 h1 { font-size: 24px; margin: 8px 0 4px; letter-spacing: -0.02em; }
 h2 { font-size: 18px; margin: 28px 0 10px; letter-spacing: -0.01em; }
@@ -91,7 +100,7 @@ svg { display: block; width: 100%; height: auto; }
 </head>
 <body>
 <header>
-  <a class="brand" href="#/">Tennis Vision</a>
+  <a class="brand" href="#/" aria-label="Tracer Tennis home"><img src="/static/logo-mark.svg" alt=""><span class="word"><b>TRACER</b><span>TENNIS</span></span></a>
   <nav><a href="#/new/swing">Swing</a><a href="#/new/lesson">Lesson</a><a href="#/new/match">Match</a></nav>
 </header>
 <main id="view"></main>
@@ -133,7 +142,9 @@ async function home() {
       <div class="muted">Record part of a lesson. Every shot is listed with its type (forehand, backhand, volley, overhead), where it was hit from, where it landed, and in or out.</div></a>
     <a class="card" href="#/new/match"><div class="big">Match or session</div>
       <div class="muted">Singles or doubles. Tracks every player, the ball and each shot; with the court marked it adds placement, stats, positioning and strategy.</div></a>
+    <div id="phone"></div>
     <h2>Recent</h2><div id="recent" class="muted">Loading…</div>`;
+  phoneCard();
   try {
     const jobs = await api('/api/jobs');
     $('#recent').innerHTML = jobs.length ? jobs.map(j => `
@@ -141,6 +152,27 @@ async function home() {
       <div class="small muted">${new Date(j.created * 1000).toLocaleString()} · ${j.status === 'done' ? 'ready' : esc(j.status)}</div></a>`).join('')
       : 'Nothing yet. Upload a video to start.';
   } catch (e) { $('#recent').innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+}
+
+// On the computer: show how to open the app on the phone. On the phone: show how to add it to the home screen.
+async function phoneCard() {
+  const onComputer = ['localhost', '127.0.0.1'].includes(location.hostname);
+  const standalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+  const box = $('#phone');
+  if (!box) return;
+  if (onComputer) {
+    let info;
+    try { info = await api('/api/info'); } catch (e) { return; }
+    if (!$('#phone')) return;
+    box.innerHTML = info.urls.length ? `<h2>Use it on your iPhone</h2><div class="card"><div class="row wrap" style="align-items:flex-start">
+        <img src="/api/qr" alt="QR code for ${esc(info.urls[0])}" width="150" height="150" style="border-radius:8px;background:#fff">
+        <div style="flex:1;min-width:180px"><p>1. Put the iPhone on the same Wi-Fi as this computer.</p><p>2. Point the camera at the code and open the link.</p>
+          <p>3. In Safari tap Share, then <b>Add to Home Screen</b>.</p><p class="small muted">Address: ${info.urls.map(esc).join(' or ')}</p></div></div>
+        <p class="small muted">Videos are processed on this computer, so it has to be on with this app running.</p></div>`
+      : `<div class="card small muted">This computer is not on a network, so a phone cannot reach it yet.</div>`;
+  } else if (!standalone && /iPhone|iPad/.test(navigator.userAgent)) {
+    box.innerHTML = `<div class="card small">Install it: tap <b>Share</b>, then <b>Add to Home Screen</b>. It then opens full screen like any other app.</div>`;
+  }
 }
 
 // ---------- new job ----------

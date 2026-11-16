@@ -414,6 +414,8 @@ def main() -> None:
     ap.add_argument("--no-mocap", action="store_true")
     ap.add_argument("--lesson", action="store_true", help="lesson mode: judge every shot in or out on its own")
     args = ap.parse_args()
+    from .. import ensure_ffmpeg
+    ensure_ffmpeg()
     corners = None
     if args.corners:
         v = [float(x) for x in args.corners.split(",")]

@@ -1,4 +1,4 @@
-# Tennis Vision
+# Tracer Tennis
 
 Film tennis on an iPhone, upload the video, get back motion capture of the swing and a breakdown of the play.
 
@@ -17,20 +17,41 @@ Three modes:
   For each player it lists shots by type (forehand, backhand, volleys, overhead, serve), by where they were hit
   from (net, mid-court, baseline), by landing depth, and in / net / long / wide.
 
-## Run it
+## Install it as an app
 
-```bash
-python -m venv .venv && . .venv/bin/activate
-pip install torch --index-url https://download.pytorch.org/whl/cpu     # or the CUDA build on a GPU machine
-pip install -r requirements.txt
-python -m app.server                                                   # http://0.0.0.0:8000
-```
+**On the computer (Windows or Mac)**
 
-Needs `ffmpeg` on the path. Model weights (about 80 MB) download on first use.
+1. Install Python 3.10 or newer from python.org if it is not there already (on Windows tick "Add python.exe to PATH").
+2. Download this folder and unzip it.
+3. Double-click **Start Tracer Tennis.bat** (Windows) or **Start Tracer Tennis.command** (Mac).
 
-Open `http://<computer-ip>:8000` in Safari on the iPhone (same Wi-Fi) and use Share, Add to Home Screen. Pick a
-video from the library or record one, then wait for the report. The computer does the processing; the phone only
-uploads and displays.
+The first start takes 5 to 10 minutes: it builds a private Python environment in `.venv` and downloads the tracking
+libraries (about 1.5 GB) and, on first use, the model weights (about 80 MB). After that it starts in a few seconds
+and opens the app in its own window. Leave the black terminal window open while you use it; close it to stop.
+If ffmpeg is not installed it is fetched automatically.
+
+**On the iPhone**
+
+1. Put the phone on the same Wi-Fi as the computer.
+2. Scan the QR code on the app's home page on the computer (or type the address shown there into Safari).
+3. In Safari tap Share, then **Add to Home Screen**.
+
+It now has its own icon and opens full screen. Pick a video from the library or record one, choose Swing, Lesson
+or Match, and tap Analyze. The computer does the processing, so it has to be on with the app running. Reports stay
+in the Recent list.
+
+**Away from home.** The phone can only reach the computer on the same network. To use it from the court, install
+Tailscale (free) on both the computer and the iPhone; the app then also lists a `100.x.x.x` address that works from
+anywhere while the computer is on. The alternative is to run this on a rented cloud server.
+
+**Who can reach it.** There is no login. Anyone on the same Wi-Fi who knows the address can upload videos and see
+reports, so run it on a home network, not a public one.
+
+**Icon.** The app icon is a redraw of the Tracer Tennis mark (`app/static/logo-mark.svg`). To use the original
+artwork instead, run `python -m app.icons path/to/app-icon.png` with a square image of the icon; it writes the
+three sizes the home screen uses.
+
+Developer start, without the launcher: `pip install -r requirements.txt` then `python -m app.server`.
 
 Command line, without the web app:
 
