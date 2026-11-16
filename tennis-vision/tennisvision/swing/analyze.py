@@ -14,6 +14,7 @@ import numpy as np
 from scipy.signal import butter, find_peaks, savgol_filter, sosfiltfilt
 
 from .. import pose as P
+from .coach import coach
 from ..pose import PoseSequence
 
 SHOULDER_TO_ANKLE = 0.779      # fraction of stature (Winter anthropometric table)
@@ -45,6 +46,8 @@ class Swing:
     metrics: list[Metric] = field(default_factory=list)
     sequence: list[dict] = field(default_factory=list)
     findings: list[dict] = field(default_factory=list)
+    topdown: dict = field(default_factory=dict)       # bird's-eye positions of feet, hips, shoulders and hand
+    coaching: dict = field(default_factory=dict)      # scores, fixes and strengths in plain language
 
     def metric(self, key: str):
         for m in self.metrics:
@@ -461,6 +464,9 @@ class SwingAnalyzer:
         rot_to_contact = float((self.shoulder_angle[contact] - self.shoulder_angle[back]) * swing_sign)
         add("shoulder_rotation", "Shoulder rotation, backswing to contact", round(rot_to_contact), "deg", "Forward swing", typical="70-110")
 
+        if stroke != "serve/overhead":
+            self._feet_and_through(swing, u, add)
+
         # --- follow-through
         opp_shoulder_y = xy[finish, o["sh"], 1]
         finish_h = float((opp_shoulder_y - xy[finish, d["wr"], 1]) * self.m_per_px * 100)
@@ -475,7 +481,113 @@ class SwingAnalyzer:
         add("rotation_after", "Shoulder rotation after contact", round(rot_after), "deg", "Follow-through", typical="30-70")
 
         swing.findings = self._findings(swing)
+        swing.coaching = coach(swing.metrics, stroke)
         return swing
+
+    # ---- feet, and working through the ball -------------------------------
+    def _ground_frame(self, u: np.ndarray, frame: int) -> np.ndarray:
+        """Unit vector across the hitting line, pointing the way the chest faces at this frame."""
+        w = self.world
+        across = np.array([u[1], -u[0]])
+        chest = np.cross((w[frame, P.L_SHOULDER] - w[frame, P.R_SHOULDER]), np.array([0.0, 1.0, 0.0]))[[0, 2]]
+        toes = ((w[frame, P.L_TOE] + w[frame, P.R_TOE]) - (w[frame, P.L_HEEL] + w[frame, P.R_HEEL]))[[0, 2]]
+        if np.dot(chest, toes) < 0:
+            chest = -chest
+        return across if np.dot(across, chest) >= 0 else -across
+
+    def _foot_direction(self, frame: int, heel: int, toe: int) -> np.ndarray:
+        lo, hi = max(frame - 2, 0), min(frame + 3, len(self.t))
+        v = np.median((self.world[lo:hi, toe] - self.world[lo:hi, heel])[:, [0, 2]], axis=0)
+        return v / (np.linalg.norm(v) + 1e-9)
+
+    def _along(self, points_xz: np.ndarray, u: np.ndarray) -> np.ndarray:
+        """Travel toward the target, in metres. World landmarks ride with the hips, so the hips' own travel is added back."""
+        hip_x = (self.xy[:, P.L_HIP, 0] + self.xy[:, P.R_HIP, 0]) / 2 * self.m_per_px
+        return points_xz @ u + hip_x * u[0]
+
+    def _feet_and_through(self, swing: Swing, u: np.ndarray, add) -> None:
+        w, t, fps, d = self.world, self.t, self.fps, self.dom
+        back, contact, finish = swing.frames["backswing_end"], swing.frames["contact"], swing.frames["finish"]
+        n = len(t)
+        feet = {"left": (P.L_HEEL, P.L_TOE, P.L_ANKLE), "right": (P.R_HEEL, P.R_TOE, P.R_ANKLE)}
+        along = {side: self._along(w[:, ank][:, [0, 2]], u) for side, (_, _, ank) in feet.items()}
+        front = max(feet, key=lambda side: along[side][contact])
+        rear = "left" if front == "right" else "right"
+
+        def angle_to_target(frame: int, side: str) -> float:
+            v = self._foot_direction(frame, feet[side][0], feet[side][1])
+            return float(np.degrees(np.arccos(np.clip(np.dot(v, u), -1, 1))))
+
+        # stance: where the front foot sits relative to the back foot
+        across_dir = self._ground_frame(u, contact)
+        gap = (w[contact, feet[front][2]] - w[contact, feet[rear][2]])[[0, 2]]
+        a, b = float(np.dot(gap, u)), float(np.dot(gap, across_dir))
+        line = float(np.degrees(np.arctan2(b, max(a, 1e-6))))
+        if a < 0.12 or line < -50:
+            stance, meaning = "open", "feet side by side, chest facing the net"
+        elif line < -15:
+            stance, meaning = "semi-open", "front foot forward and slightly away from the ball"
+        elif line <= 15:
+            stance, meaning = "neutral", "front foot stepped straight toward the target"
+        else:
+            stance, meaning = "closed", "front foot stepped across, toward the ball"
+        add("stance_type", "Stance at contact", stance, "", "Feet", typical="any can work; neutral or semi-open on a rally ball",
+            note=f"{meaning.capitalize()}. Front foot is the {front} one.")
+
+        front_angle = angle_to_target(contact, front)
+        add("front_foot_angle", "Front foot direction at contact (0 = toes at the target)", round(front_angle), "deg", "Feet",
+            typical="20-70", status="good" if front_angle <= 75 else "ok" if front_angle <= 95 else "work",
+            note="A front foot pointing at the side fence locks the hips and stops the body turning through the shot.")
+        back_angle = angle_to_target(back, rear)
+        add("back_foot_angle", "Back foot direction when the racket is back (90 = sideways)", round(back_angle), "deg", "Feet",
+            typical="60-120", status="good" if 55 <= back_angle <= 125 else "ok" if 35 <= back_angle <= 145 else "work",
+            note="A sideways back foot lets the hips turn and load. Toes left pointing at the net means the turn never happened.")
+        pivot = angle_to_target(back, rear) - angle_to_target(min(finish, n - 1), rear)
+        add("back_foot_pivot", "Back foot turn toward the target by the finish", round(pivot), "deg", "Feet", typical="30-90",
+            status="good" if pivot >= 25 else "ok" if pivot >= 10 else "work",
+            note="The back foot should roll up and turn as the hips come through. A back foot that stays planted holds the hips back.")
+        step = float(along[front][contact] - along[front][back])
+        add("step_in", "Front foot step toward the target", round(step * 100), "cm", "Feet", typical="20-60 on a ball you have time for",
+            status="good" if step >= 0.15 else "ok" if step >= 0.03 else "info",
+            note="Stepping in moves body weight into the shot. Open-stance shots load and turn instead, so a small step is fine there.")
+
+        # through the ball
+        hand_along = self._along(w[:, d["wr"]][:, [0, 2]], u)
+        after = slice(contact, min(contact + int(0.3 * fps) + 1, n))
+        extension = float(np.max(hand_along[after]) - hand_along[contact])
+        add("extension", "Extension: hand travel toward the target after contact", round(extension * 100), "cm", "Through the ball",
+            typical="40-70", status="good" if extension >= 0.40 else "ok" if extension >= 0.25 else "work",
+            note="How far the hand keeps going out toward the target before it wraps around. Short means the swing was cut off.")
+        k = min(contact + max(1, int(round(0.05 * fps))), n - 1)
+        carried = float(self.hand_speed[k] / max(self.hand_speed[contact], 1e-6))
+        add("speed_carried", "Speed kept just after contact (50 ms later)", round(100 * carried), "%", "Through the ball", typical="85 or more",
+            status="good" if carried >= 0.85 else "ok" if carried >= 0.70 else "work",
+            note="A swing that is still accelerating holds its speed past the ball. A drop here means braking at contact.")
+        hips_along = self._along(((w[:, P.L_HIP] + w[:, P.R_HIP]) / 2)[:, [0, 2]], u)
+        k0, k1 = max(contact - int(0.1 * fps), 0), min(contact + int(0.15 * fps), n - 1)
+        weight = float(hips_along[k1] - hips_along[k0])
+        add("weight_through", "Body weight moving toward the target through contact", round(weight * 100), "cm", "Through the ball",
+            typical="5-25", status="good" if weight >= 0.05 else "ok" if weight >= -0.02 else "work",
+            note="Hip travel along the hitting line around contact. Negative means falling back, away from the shot.")
+        chest = ((w[contact, P.L_SHOULDER] + w[contact, P.R_SHOULDER]) / 2 - (w[contact, P.L_HIP] + w[contact, P.R_HIP]) / 2)[[0, 2]]
+        lead = float(np.dot(chest, u))
+        add("chest_lead", "Chest ahead of the hips at contact", round(lead * 100), "cm", "Through the ball", typical="0-20",
+            status="good" if lead >= -0.02 else "ok" if lead >= -0.08 else "work",
+            note="Chest over or ahead of the hips keeps the weight going into the ball. Behind the hips means leaning back.")
+
+        # bird's-eye view for the report (x = across the hitting line toward the chest side, y = toward the target)
+        def top(frame: int) -> dict:
+            across = self._ground_frame(u, frame)
+            centre = ((w[frame, P.L_HIP] + w[frame, P.R_HIP]) / 2)[[0, 2]]
+            pt = lambda j: [round(float(np.dot(w[frame, j][[0, 2]] - centre, across)), 3), round(float(np.dot(w[frame, j][[0, 2]] - centre, u)), 3)]
+            out = dict(hips=[pt(P.L_HIP), pt(P.R_HIP)], shoulders=[pt(P.L_SHOULDER), pt(P.R_SHOULDER)], hand=pt(d["wr"]), feet=[])
+            for side, (heel, toe, ank) in feet.items():
+                v = self._foot_direction(frame, heel, toe)
+                out["feet"].append(dict(side=side, front=side == front, pos=pt(ank),
+                                        dir=[round(float(np.dot(v, across)), 3), round(float(np.dot(v, u)), 3)]))
+            return out
+
+        swing.topdown = dict(set=top(back), contact=top(contact), front=front, stance=stance)
 
     def _findings(self, swing: Swing) -> list[dict]:
         strengths = [dict(kind="strength", text=f"{m.label}: {m.value} {m.unit}".strip() + (f". {m.note}" if m.note else ""))
