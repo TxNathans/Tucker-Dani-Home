@@ -120,11 +120,22 @@ def _foot_arrow(img, pts, vis, heel, toe, color, thick):
 
 
 def _trail(img, points, ok, color, thick):
+    """Path that fades out toward its older end (blended into the picture, so the tail goes clear rather than dark)."""
+    if len(points) < 2:
+        return
+    alpha = np.zeros(img.shape[:2], np.uint8)
     for k in range(1, len(points)):
         if ok[k] and ok[k - 1]:
             f = k / len(points)
-            cv2.line(img, tuple(np.int32(points[k - 1])), tuple(np.int32(points[k])),
-                     tuple(int(c * (0.25 + 0.75 * f)) for c in color), max(1, int(thick * (0.5 + f))), cv2.LINE_AA)
+            cv2.line(alpha, tuple(np.int32(points[k - 1])), tuple(np.int32(points[k])), int(235 * f ** 1.5),
+                     max(1, int(thick * (0.5 + f))), cv2.LINE_AA)
+    ys, xs = np.nonzero(alpha)
+    if not len(ys):
+        return
+    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+    a = alpha[y0:y1, x0:x1, None].astype(np.float32) / 255.0
+    region = img[y0:y1, x0:x1].astype(np.float32)
+    img[y0:y1, x0:x1] = (region * (1 - a) + np.array(color, np.float32) * a).astype(np.uint8)
 
 
 def _phase_at(swings: list[Swing], frame: int) -> str:
