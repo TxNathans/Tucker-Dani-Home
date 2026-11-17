@@ -141,7 +141,7 @@ def _trail(img, points, ok, color, thick):
 def _phase_at(swings: list[Swing], frame: int) -> str:
     label = ""
     for s in swings:
-        for key, name in PHASE_LABELS:
+        for key, name in (s.phases or PHASE_LABELS):
             if s.frames[key] <= frame <= s.frames["finish"] + 6:
                 label = f"{s.index}. {name}" if len(swings) > 1 else name
     return label
@@ -165,10 +165,11 @@ def _foot_status(swings: list[Swing], frame: int) -> dict[str, str]:
 
 
 def render_overlay(video_path: str, out_path: str, an: SwingAnalyzer, swings: list[Swing], info: VideoInfo,
-                   keyframe_dir: str | None = None, out_height: int = 1080, progress=None) -> dict:
+                   keyframe_dir: str | None = None, out_height: int = 1080, progress=None,
+                   crop: tuple[int, int, int, int] | None = None) -> dict:
     """Write the annotated video. Returns {"<swing>:<phase>": filename} for the exported key frames."""
     seq = an.seq
-    x0, y0, x1, y1 = crop_box(an)
+    x0, y0, x1, y1 = crop or crop_box(an)
     scale = out_height / (y1 - y0)
     ow, oh = int((x1 - x0) * scale) // 2 * 2, out_height // 2 * 2
     d = an.dom
@@ -176,7 +177,7 @@ def render_overlay(video_path: str, out_path: str, an: SwingAnalyzer, swings: li
     thick = max(2, int(round(oh / 400)))
     wanted: dict[int, list] = {}
     for s in swings:
-        for key, name in PHASE_LABELS[1:]:
+        for key, name in (s.phases or PHASE_LABELS)[1:]:
             wanted.setdefault(s.frames[key], []).append((s.index, key))
     contact_frames = {s.frames["contact"] for s in swings}
     keyframes: dict[str, str] = {}

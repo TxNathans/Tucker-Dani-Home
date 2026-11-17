@@ -46,6 +46,9 @@ class Swing:
     metrics: list[Metric] = field(default_factory=list)
     sequence: list[dict] = field(default_factory=list)
     findings: list[dict] = field(default_factory=list)
+    phases: list = field(default_factory=lambda: [["takeback", "Ready"], ["backswing_end", "Racket back"],
+                                                  ["forward_swing", "Swing"], ["contact", "Contact"], ["finish", "Finish"]])
+    serve: dict = field(default_factory=dict)         # serve type and view, for serve analysis
     topdown: dict = field(default_factory=dict)       # bird's-eye positions of feet, hips, shoulders and hand
     coaching: dict = field(default_factory=dict)      # scores, fixes and strengths in plain language
 
@@ -466,6 +469,8 @@ class SwingAnalyzer:
 
         if stroke != "serve/overhead":
             self._feet_and_through(swing, u, add)
+            self._legs(swing, add)
+            self._racket_angles(swing, add)
 
         # --- follow-through
         opp_shoulder_y = xy[finish, o["sh"], 1]
@@ -588,6 +593,114 @@ class SwingAnalyzer:
             return out
 
         swing.topdown = dict(set=top(back), contact=top(contact), front=front, stance=stance)
+
+    # ---- lead and trail leg ------------------------------------------------
+    def _legs(self, swing: Swing, add) -> None:
+        """Knee readings for the lead (front) and trail (back) leg, and how much of the body sits over the lead leg."""
+        w, xy = self.world, self.xy
+        f = swing.frames
+        take, back, fwd, contact = f["takeback"], f["backswing_end"], f["forward_swing"], f["contact"]
+        lead = swing.topdown.get("front", "left")
+        trail = "left" if lead == "right" else "right"
+        joints = {"left": (P.L_HIP, P.L_KNEE, P.L_ANKLE), "right": (P.R_HIP, P.R_KNEE, P.R_ANKLE)}
+        knee = {side: _angle(w[:, h], w[:, k], w[:, a]) for side, (h, k, a) in joints.items()}
+        lead_back, lead_contact = float(knee[lead][back]), float(knee[lead][contact])
+        trail_deep = float(knee[trail][take:contact + 1].min())
+        trail_contact = float(knee[trail][contact])
+        add("lead_knee_back", "Lead leg: knee angle with the racket back (180 = straight)", round(lead_back), "deg", "Legs",
+            typical="120-160", note="The front leg. Soft and ready, not locked.")
+        add("lead_knee_contact", "Lead leg: knee angle at contact", round(lead_contact), "deg", "Legs", typical="135-175",
+            status="good" if 135 <= lead_contact <= 176 else "ok",
+            note="The front leg should be firm at contact so the body can turn around it. Much under 135 means it is collapsing.")
+        brace = float(lead_contact - knee[lead][fwd])
+        add("lead_brace", "Lead leg: straightening during the forward swing", round(brace), "deg", "Legs", typical="5-30",
+            note="A front leg that firms up into contact gives the hips something to turn against.")
+        add("trail_knee_back", "Trail leg: deepest knee bend while loading", round(trail_deep), "deg", "Legs", typical="110-145",
+            note="The back leg. This is the leg that loads and pushes.")
+        add("trail_knee_contact", "Trail leg: knee angle at contact", round(trail_contact), "deg", "Legs", typical="130-170")
+        add("trail_drive", "Trail leg: push (straightening from deepest bend to contact)", round(trail_contact - trail_deep), "deg", "Legs",
+            typical="15-40", note="How much the back leg drives up and forward into the shot.")
+        ankle = {"left": P.L_ANKLE, "right": P.R_ANKLE}
+        hips_x = (xy[:, P.L_HIP, 0] + xy[:, P.R_HIP, 0]) / 2
+
+        def over_lead(frame: int) -> float | None:
+            span = xy[frame, ankle[lead], 0] - xy[frame, ankle[trail], 0]
+            if abs(span) * self.m_per_px < 0.35:
+                return None                        # feet close together as the camera sees them: the reading would be unstable
+            return float((hips_x[frame] - xy[frame, ankle[trail], 0]) / span * 100)
+
+        at_back, at_contact = over_lead(back), over_lead(contact)
+        if at_back is not None:
+            add("weight_on_lead_back", "Body over the lead leg with the racket back", round(at_back), "%", "Legs", typical="25-50",
+                note="Estimated from where the hips sit between the feet, not from a force plate. Low means loaded on the back leg.")
+        if at_contact is not None:
+            stance = swing.metric("stance_type")
+            target = "40-70" if stance in ("open", "semi-open") else "55-85"
+            lo = 40 if stance in ("open", "semi-open") else 55
+            add("weight_on_lead", "Body over the lead leg at contact", round(at_contact), "%", "Legs", typical=target,
+                status="good" if at_contact >= lo else "ok" if at_contact >= lo - 15 else "work",
+                note="Estimated from where the hips sit between the feet. It should move forward from the racket-back reading.")
+
+    # ---- racket angles -----------------------------------------------------
+    def _racket_angles(self, swing: Swing, add) -> None:
+        """Racket shaft angle at the key moments, racket lag, and the approach angle of the racket head into the ball."""
+        if self.racket is None:
+            return
+        d, xy = self.dom, self.xy
+        f = swing.frames
+        back, fwd, contact = f["backswing_end"], f["forward_swing"], f["contact"]
+        head, valid = self.racket["head"], self.racket["valid"]
+        wrist, elbow = xy[:, d["wr"]], xy[:, d["el"]]
+        shaft = head - wrist
+        length = np.linalg.norm(shaft, axis=1) + 1e-9
+        tip_up = np.degrees(np.arcsin(np.clip(-shaft[:, 1] / length, -1, 1)))      # +90 = tip straight up, 0 = level
+        forearm = wrist - elbow
+        cos = (forearm * shaft).sum(1) / (np.linalg.norm(forearm, axis=1) * length + 1e-9)
+        lag = np.degrees(np.arccos(np.clip(cos, -1, 1)))                             # 0 = racket in line with the forearm
+        seen_note = "Read from the racket's outline in the picture, so it is approximate."
+        if valid[back]:
+            add("racket_angle_back", "Racket angle with the racket back (tip above level)", round(float(tip_up[back])), "deg", "Racket",
+                typical="20-80", note="Suggested: tip above the hand as the turn finishes, not dropped early. " + seen_note)
+        swing_ok = valid[back:contact + 1]
+        if swing_ok.sum() >= 3:
+            seg = np.where(swing_ok, tip_up[back:contact + 1], np.nan)
+            low = float(np.nanmin(seg))
+            add("racket_angle_low", "Racket angle at its lowest point (negative = tip below the hand)", round(low), "deg", "Racket",
+                typical="-60 to -20", status="good" if low <= -20 else "ok" if low <= -8 else "work",
+                note="Suggested: let the tip fall 20 to 60 degrees below the hand before swinging up. That drop is what lets the racket brush up the ball.")
+        if valid[contact]:
+            add("racket_angle_contact", "Racket angle at contact (0 = level)", round(float(tip_up[contact])), "deg", "Racket",
+                typical="-25 to +15 on a waist-high ball",
+                note="Suggested: close to level at waist height, tip a little down for a low ball and up for a high one. " + seen_note)
+        lag_ok = valid[fwd:contact + 1]
+        if lag_ok.sum() >= 3:
+            peak_lag = float(np.nanmax(np.where(lag_ok, lag[fwd:contact + 1], np.nan)))
+            add("racket_lag", "Racket lag: most the racket trails the forearm in the forward swing", round(peak_lag), "deg", "Racket",
+                typical="50-90", status="good" if peak_lag >= 50 else "ok" if peak_lag >= 30 else "work",
+                note="Suggested: the racket should trail the hand by 50 to 90 degrees and then whip through. No lag means the arm and racket move as one stiff piece.")
+        a = max(contact - max(2, int(round(0.05 * self.fps))), 0)
+        if valid[a] and valid[contact]:
+            step = head[contact] - head[a]
+            approach = float(np.degrees(np.arctan2(-step[1], abs(step[0]) + 1e-9)))
+            add("approach_angle", "Approach angle: racket head path into the ball (up from level)", round(approach), "deg", "Racket",
+                typical="15-35 for a topspin drive",
+                status="good" if 12 <= approach <= 40 else "ok" if 5 <= approach < 12 or approach > 40 else "work",
+                note="Suggested: 15 to 35 degrees upward for a topspin drive (measured players average about 21), flatter for a "
+                     "flat drive, steeper for heavy spin or a lob.")
+        b = min(contact + max(2, int(round(0.04 * self.fps))), len(valid) - 1)
+        pts = head[fwd:b + 1][valid[fwd:b + 1]]
+        if len(pts) >= 4:
+            centred = pts - pts.mean(axis=0)
+            _, sing, vt = np.linalg.svd(centred, full_matrices=False)
+            line = vt[0]
+            plane = float(np.degrees(np.arctan2(abs(line[1]), abs(line[0]) + 1e-9)))
+            straight = float(sing[0] ** 2 / (np.sum(sing ** 2) + 1e-9) * 100)
+            add("swing_plane", "Racket plane: tilt of the racket head's path through the hitting zone", round(plane), "deg", "Racket",
+                typical="20-45 for a topspin drive",
+                note=f"The line the racket head travels along from the start of the forward swing to just past contact, as the "
+                     f"camera sees it. {straight:.0f}% of the path lies on that line; the rest is the loop.")
+        add("face_angle", "Racket face tilt at contact", "not measurable", "", "Racket", typical="5-15 closed",
+            note="Suggested: strings tilted 5 to 15 degrees toward the court on a topspin drive. One side-on camera cannot read this.")
 
     def _findings(self, swing: Swing) -> list[dict]:
         strengths = [dict(kind="strength", text=f"{m.label}: {m.value} {m.unit}".strip() + (f". {m.note}" if m.note else ""))

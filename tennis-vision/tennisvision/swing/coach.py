@@ -17,6 +17,89 @@ POINTS = {"good": 100, "ok": 70, "work": 35}
 SITUATIONAL = {"trunk_lean", "head_stability", "balance", "contact_spacing", "contact_height", "follow_length", "finish_height"}
 
 
+GRADE_WORDS = {"strength": "Strength", "on_target": "On target", "building": "Building", "priority": "Priority",
+               "not_graded": "Not graded"}
+
+# What is off, said to the player in one short line. Shown as the headline for the thing to work on.
+PROBLEMS = {
+    "contact_in_front": lambda v: "You're meeting the ball too close to your body.",
+    "extension": lambda v: "Your swing stops short of the target.",
+    "speed_carried": lambda v: "You're braking as you meet the ball.",
+    "weight_through": lambda v: "Your weight is falling back off the shot.",
+    "chest_lead": lambda v: "You're leaning back at contact.",
+    "shoulder_turn": lambda v: "Your shoulders don't turn far enough.",
+    "separation": lambda v: "Your shoulders and hips turn as one piece.",
+    "knee_bend_dom": lambda v: "Your legs stay straight.",
+    "leg_drive": lambda v: "Your legs don't push into the shot.",
+    "front_foot_angle": lambda v: "Your front foot blocks your hips.",
+    "back_foot_angle": lambda v: "Your back foot doesn't set the turn.",
+    "back_foot_pivot": lambda v: "Your back foot stays stuck to the court.",
+    "trunk_lean": lambda v: "Your upper body tips over at contact.",
+    "head_stability": lambda v: "Your head moves as you hit.",
+    "balance": lambda v: "Your hips drift outside your feet.",
+    "swing_path": lambda v: "Your swing comes through too flat.",
+    "racket_drop": lambda v: "Your racket doesn't get under the ball.",
+    "contact_spacing": lambda v: "You're crowding the ball." if v < 35 else "You're reaching for the ball.",
+    "elbow_contact": lambda v: "Your hitting arm is jammed.",
+    "follow_length": lambda v: "Your swing stops right after the ball.",
+    "finish_height": lambda v: "Your swing finishes low.",
+    "prep_time": lambda v: "Your racket gets back late.",
+    "sequence": lambda v: "Your arm starts before your hips.",
+}
+
+# key -> (meter start, meter end, target low, target high)
+METERS = {
+    "contact_in_front": (-20, 70, 20, 50), "extension": (0, 90, 40, 70), "speed_carried": (40, 110, 85, 105),
+    "weight_through": (-15, 35, 5, 25), "chest_lead": (-20, 35, 0, 20), "shoulder_turn": (0, 130, 90, 110),
+    "hip_turn": (0, 110, 45, 80), "separation": (-10, 50, 20, 40), "knee_bend_dom": (90, 180, 110, 145),
+    "knee_bend_off": (90, 180, 110, 145), "leg_drive": (0, 50, 15, 40), "front_foot_angle": (0, 130, 20, 70),
+    "back_foot_angle": (0, 180, 60, 120), "back_foot_pivot": (-10, 100, 30, 90), "step_in": (-10, 80, 20, 60),
+    "stance_width": (0.5, 3.5, 1.5, 2.5), "swing_path": (-10, 70, 15, 45), "racket_drop": (0, 70, 20, 50),
+    "contact_height": (0.2, 1.6, 0.85, 1.35), "contact_spacing": (0, 100, 35, 70), "elbow_contact": (60, 180, 100, 180),
+    "shoulders_at_contact": (-20, 90, 0, 40), "trunk_lean": (0, 50, 0, 20), "head_stability": (0, 30, 0, 8),
+    "balance": (-20, 120, 30, 70), "follow_length": (0, 2.2, 1.0, 2.0), "finish_height": (-60, 40, -10, 20),
+    "prep_time": (0, 1.5, 0.6, 1.3), "forward_swing_time": (0, 0.6, 0.15, 0.35), "tempo_ratio": (0, 5, 2, 4),
+    "hip_rotation_speed": (0, 800, 300, 600), "shoulder_rotation_speed": (0, 1100, 500, 900),
+    "racket_head_speed": (0, 40, 25, 35), "shoulder_rotation": (0, 130, 70, 110), "rotation_after": (0, 90, 30, 70),
+    "swing_length": (0, 2.5, 1.2, 2.0),
+    "lead_knee_back": (90, 180, 120, 160), "lead_knee_contact": (90, 180, 135, 175), "lead_brace": (-30, 50, 5, 30),
+    "trail_knee_back": (90, 180, 110, 145), "trail_knee_contact": (90, 180, 130, 170), "trail_drive": (0, 50, 15, 40),
+    "weight_on_lead_back": (0, 100, 25, 50), "weight_on_lead": (0, 120, 55, 85),
+    "racket_angle_back": (-30, 90, 20, 80), "racket_angle_low": (-90, 30, -60, -20), "racket_angle_contact": (-60, 60, -25, 15),
+    "racket_lag": (0, 120, 50, 90), "approach_angle": (-10, 70, 15, 35), "swing_plane": (0, 90, 20, 45),
+}
+
+# A number this far past its target counts as a strength rather than just on target: key -> (direction, value)
+STRENGTH_AT = {
+    "contact_in_front": (1, 35), "extension": (1, 55), "speed_carried": (1, 95), "shoulder_turn": (1, 95), "separation": (1, 30),
+    "knee_bend_dom": (-1, 125), "head_stability": (-1, 4), "step_in": (1, 30), "leg_drive": (1, 25), "follow_length": (1, 1.4),
+    "weight_through": (1, 12), "back_foot_pivot": (1, 45), "racket_drop": (1, 30), "trunk_lean": (-1, 8),
+}
+
+
+def grade_of(key: str, value, status: str, situational: bool = False, strength_at: dict | None = None) -> str:
+    """The five grades used everywhere: strength, on_target, building, priority, not_graded."""
+    if status == "work":
+        return "building" if situational else "priority"
+    if status == "ok":
+        return "building"
+    if status != "good":
+        return "not_graded"
+    rule = (STRENGTH_AT if strength_at is None else strength_at).get(key)
+    if rule and isinstance(value, (int, float)) and (value - rule[1]) * rule[0] >= 0:
+        return "strength"
+    return "on_target"
+
+
+def off_target(key: str, value) -> float | None:
+    """How far a value sits outside its target range, as a share of the meter. 0 = inside the range."""
+    if key not in METERS or not isinstance(value, (int, float)):
+        return None
+    lo_m, hi_m, lo, hi = METERS[key]
+    gap = lo - value if value < lo else value - hi if value > hi else 0.0
+    return gap / (hi_m - lo_m)
+
+
 def _inches(cm: float) -> str:
     return f"{abs(cm) / 2.54:.0f} inches"
 
@@ -200,8 +283,19 @@ def band(score: float) -> str:
     return "Strong" if score >= 85 else "Solid" if score >= 70 else "Developing" if score >= 55 else "Needs work"
 
 
-def coach(metrics: list, stroke: str) -> dict:
-    """metrics: objects or dicts with key, label, value, unit, status, typical. Returns scores, fixes and strengths."""
+def coach(metrics: list, stroke: str, book: dict | None = None) -> dict:
+    """metrics: objects or dicts with key, label, value, unit, status, typical. Returns scores, fixes and strengths.
+
+    book: the coaching tables to use (categories, tips, problems, praise, situational, meters, strength_at).
+    Defaults to the groundstroke tables; the serve module passes its own.
+    """
+    book = book or {}
+    CATEGORIES = book.get("categories", globals()["CATEGORIES"])
+    PROBLEMS = book.get("problems", globals()["PROBLEMS"])
+    PRAISE = book.get("praise", globals()["PRAISE"])
+    SITUATIONAL = book.get("situational", globals()["SITUATIONAL"])
+    METERS = book.get("meters", globals()["METERS"])
+    strength_at = book.get("strength_at", STRENGTH_AT)
     get = (lambda m, k: m[k]) if metrics and isinstance(metrics[0], dict) else (lambda m, k: getattr(m, k))
     by_key = {get(m, "key"): m for m in metrics}
     value = lambda key: get(by_key[key], "value") if key in by_key else None
@@ -224,7 +318,7 @@ def coach(metrics: list, stroke: str) -> dict:
     overall = round(sum(c["score"] for c in categories) / len(categories)) if categories else None
     category_of = {k: c["name"] for c in categories for k in c["keys"]}
 
-    tips = _tips()
+    tips = book.get("tips") or _tips()
     fixes = []
     for key, m in by_key.items():
         status = get(m, "status")
@@ -240,14 +334,25 @@ def coach(metrics: list, stroke: str) -> dict:
         rank = priority * (1.0 if status == "work" else 0.45) * (0.6 if situational else 1.0)
         card = build(val, stroke)
         card.update(key=key, severity="fix" if status == "work" else "polish", category=category_of.get(key, ""),
-                    situational=situational, rank=round(rank, 2),
+                    situational=situational, rank=round(rank, 2), problem=PROBLEMS[key](val),
+                    grade=grade_of(key, val, status, situational, strength_at), value=get(m, "value"), unit=get(m, "unit"),
+                    label=get(m, "label"),
                     measured=f"{get(m, 'label')}: {val if key != 'sequence' else get(m, 'value')} {get(m, 'unit')}".strip(),
                     typical=get(m, "typical"))
         fixes.append(card)
     fixes.sort(key=lambda c: -c["rank"])
 
-    strengths = [dict(key=k, text=PRAISE[k], category=category_of.get(k, "")) for k, m in by_key.items()
-                 if get(m, "status") == "good" and k in PRAISE]
+    grades = {k: grade_of(k, get(m, "value"), get(m, "status"), stretched and k in SITUATIONAL, strength_at)
+              for k, m in by_key.items()}
+    strengths = [dict(key=k, text=PRAISE[k], category=category_of.get(k, ""), grade=grades[k], value=get(m, "value"),
+                      unit=get(m, "unit")) for k, m in by_key.items() if get(m, "status") == "good" and k in PRAISE]
+    strengths.sort(key=lambda w: (w["grade"] != "strength", -tips.get(w["key"], (0,))[0]))
+    counts = dict(priority=sum(g == "priority" for g in grades.values()), building=sum(g == "building" for g in grades.values()),
+                  on_target=sum(g in ("on_target", "strength") for g in grades.values()),
+                  strength=sum(g == "strength" for g in grades.values()))
+    counts["graded"] = counts["priority"] + counts["building"] + counts["on_target"]
+    light = "red" if counts["priority"] else "yellow" if counts["building"] else "green"
+    meters = {k: dict(min=v[0], max=v[1], lo=v[2], hi=v[3]) for k, v in METERS.items() if k in by_key}
 
     if fixes and fixes[0]["severity"] == "fix":
         headline = f"One thing to work on first: {fixes[0]['title'].lower()}."
@@ -258,4 +363,5 @@ def coach(metrics: list, stroke: str) -> dict:
     context = ("This ball pulled you wide and you hit it on the stretch, so balance and finish are judged more gently here. "
                "Film a ball hit from a set position to see your normal swing.") if stretched else ""
     return dict(overall=overall, band=band(overall) if overall is not None else None, headline=headline, context=context,
-                stretched=stretched, categories=categories, fixes=fixes, strengths=strengths)
+                stretched=stretched, categories=categories, fixes=fixes, strengths=strengths,
+                grades=grades, counts=counts, light=light, meters=meters)
