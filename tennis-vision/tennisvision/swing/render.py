@@ -166,8 +166,11 @@ def _foot_status(swings: list[Swing], frame: int) -> dict[str, str]:
 
 def render_overlay(video_path: str, out_path: str, an: SwingAnalyzer, swings: list[Swing], info: VideoInfo,
                    keyframe_dir: str | None = None, out_height: int = 1080, progress=None,
-                   crop: tuple[int, int, int, int] | None = None) -> dict:
-    """Write the annotated video. Returns {"<swing>:<phase>": filename} for the exported key frames."""
+                   crop: tuple[int, int, int, int] | None = None, clean_path: str | None = None) -> dict:
+    """Write the annotated video. Returns {"<swing>:<phase>": filename} for the exported key frames.
+
+    clean_path: also write the same crop with nothing drawn on it, so the app can draw its own switchable layers.
+    """
     seq = an.seq
     x0, y0, x1, y1 = crop or crop_box(an)
     scale = out_height / (y1 - y0)
@@ -182,12 +185,15 @@ def render_overlay(video_path: str, out_path: str, an: SwingAnalyzer, swings: li
     contact_frames = {s.frames["contact"] for s in swings}
     keyframes: dict[str, str] = {}
     max_side = max(seq.width, seq.height)
+    clean = VideoWriter(clean_path, ow, oh, info.fps, crf=19) if clean_path else None
     with VideoWriter(out_path, ow, oh, info.fps, crf=19) as writer:
         for i, _, frame in iter_frames(video_path, info, max_side=max_side):
             if i >= len(seq.t):
                 break
             crop = frame[y0:y1, x0:x1]
             img = cv2.resize(crop, (ow, oh), interpolation=cv2.INTER_AREA if scale < 1 else cv2.INTER_CUBIC)
+            if clean:
+                clean.write(img)
             pts = (an.xy[i] - (x0, y0)) * scale
             vis = seq.vis[i] if seq.detected[i] else np.ones(33)
             lo = max(0, i - trail_len)
@@ -217,4 +223,6 @@ def render_overlay(video_path: str, out_path: str, an: SwingAnalyzer, swings: li
                     keyframes[f"{swing_index}:{key}"] = fname
             if progress and i % 10 == 0:
                 progress(i / max(len(seq.t), 1))
+    if clean:
+        clean.close()
     return keyframes

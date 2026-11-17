@@ -2,14 +2,24 @@
 
 Film tennis on an iPhone, upload the video, get back motion capture of the swing and a breakdown of the play.
 
-Three modes:
+Five modes:
 
-- **Swing analysis.** One player, one or more swings. Tracks 33 body landmarks and the racket, times the swing
-  phases, and finds contact from hand speed plus the sound of the hit. It reads the feet (stance, where each foot
-  points, the step into the ball, the back-foot release) and how well the swing works through the ball (extension
-  toward the target after contact, speed kept past the ball, weight moving forward). The report gives a score, the
-  fixes in priority order, and a Player view and a Coach view: each fix says what was seen, why it matters, one
-  cue, one drill, and (for coaches) the measurement and typical range.
+- **Swing.** One player, one or more swings. Tracks 33 body landmarks and the racket, times the swing phases, and
+  finds contact from hand speed plus the sound of the hit. It reads the feet (stance, where each foot points, the
+  step into the ball, the back-foot release), the lead and trail leg (knee angles, brace, push, weight over the
+  lead leg), the racket (angle with the racket back, at its lowest point and at contact, lag, approach angle,
+  swing plane) and how well the swing works through the ball. Every graded number gets one of five grades
+  (Strength, On target, Building, Priority, Not graded) against a target range. The screen shows one thing to work
+  on first with what was seen, the one cue to think about, and a drill, then what is already working, then every
+  number with its target.
+- **Serve.** The same tracking, broken into the parts of the serve: start, toss, trophy position, racket drop,
+  contact, finish. It grades the toss arm, knee bend, trunk and shoulder tilt, coil, elbow position, racket drop,
+  leg drive, contact height and position, the swing up into the ball and the landing. Pick flat, slice or kick
+  and it is graded against that serve, or let the app read the type from where the ball was met and how steeply
+  the racket came up.
+- **Compare.** Any two analysed swings (or two serves) side by side, lined up on contact, with one set of
+  controls. The first is the baseline and the second the retest: it shows whether the things the baseline needed
+  moved the right way, what else got better, what slipped, and what to keep working on.
 - **Match or session.** Singles or doubles. Tracks each player (told apart by clothing), the ball, the rackets and
   every hit and bounce. If the camera is fixed and you mark the four court corners, it also gives landing spots,
   in/out, shot speed, serve placement, scoring, the full stat sheet, positioning (where each player stands when
@@ -38,8 +48,8 @@ If ffmpeg is not installed it is fetched automatically.
 2. Scan the QR code on the app's home page on the computer (or type the address shown there into Safari).
 3. In Safari tap Share, then **Add to Home Screen**.
 
-It now has its own icon and opens full screen. Pick a video from the library or record one, choose Swing, Lesson
-or Match, and tap Analyze. The computer does the processing, so it has to be on with the app running. Reports stay
+It now has its own icon and opens full screen. Pick a video from the library or record one, choose Swing, Serve,
+Lesson or Match, and tap Analyze. The computer does the processing, so it has to be on with the app running. Reports stay
 in the Recent list.
 
 **Away from home.** The phone can only reach the computer on the same network. To use it from the court, install
@@ -48,6 +58,16 @@ anywhere while the computer is on. The alternative is to run this on a rented cl
 
 **Who can reach it.** There is no login. Anyone on the same Wi-Fi who knows the address can upload videos and see
 reports, so run it on a home network, not a public one.
+
+**The video player.** Swing, serve and compare videos are stored clean, and the app draws everything on top, so
+each overlay has its own switch: body lines, hand path, racket tracer (the whole path of the racket head), racket
+plane (the surface the racket sweeps, with its tilt), feet, joint angles, contact marker, racket box and labels.
+Beside the video are drawing tools: line (shows its angle from level), angle (shows degrees), circle and freehand
+in yellow, white or red, with undo, clear and save picture. Playback has frame stepping, a jump to contact, time
+in milliseconds from contact and speeds down to 1/10. Space plays and pauses; the arrow keys step a frame.
+
+**Look.** Light frosted glass by default, with a dark version on the moon button in the top bar. The type is
+DM Sans (SIL Open Font License, bundled in `app/static/fonts`).
 
 **Icon.** The icon, logo mark and wordmark in `app/static` are cut from the Tracer Tennis brand sheet. To change
 the icon, run `python -m app.icons path/to/app-icon.png` with a square image; it writes the three sizes the home
@@ -59,6 +79,7 @@ Command line, without the web app:
 
 ```bash
 python -m tennisvision.swing.pipeline clip.mov --out out/swing --height 1.70
+python -m tennisvision.swing.pipeline serve.mov --out out/serve --height 1.80 --serve --serve-type kick
 python -m tennisvision.match.pipeline match.mp4 --out out/match --format doubles \
     --names "Dani,Pat,Opp1,Opp2" --corners 0.30,0.29,0.69,0.27,0.81,0.80,0.20,0.78
 python -m tennisvision.match.pipeline lesson.mp4 --out out/lesson --lesson --names "Student,Coach" --corners ...
@@ -72,6 +93,7 @@ pytest tests
 | For | Camera | Why |
 | --- | --- | --- |
 | Swing analysis | Side-on or behind, whole body in frame, 60 fps or slow-motion (120/240) | Higher frame rates sharpen contact timing and the racket |
+| Serve analysis | Side-on or from behind, whole body and the full reach of the racket in frame, one serve per clip | Side-on shows how far into the court the ball is met; from behind shows how far out to the side |
 | Match stats, positioning, strategy | Tripod or fence mount, high behind the baseline, whole court visible, phone not moving | Court positions need a fixed view of all four corners |
 | Quick session review | Anything, including handheld | You still get players, shots, stroke types and per-shot mocap, but no court positions |
 
@@ -81,7 +103,17 @@ pytest tests
 kinetic-chain order and timing, hip and shoulder rotation speed, hand speed (peak and at contact), racket-head
 speed (estimate), racket drop below contact, swing path angle, elbow angle at contact, contact height, contact
 point in front and to the side, trunk lean, head stability, balance over the base, leg drive, weight shift,
-finish height, follow-through length.
+finish height, follow-through length; lead and trail knee angle with the racket back and at contact, lead-leg
+brace, trail-leg push, share of weight over the lead leg; racket angle with the racket back, at its lowest point
+and at contact, racket lag, approach angle into the ball, swing plane. Racket face tilt cannot be measured from
+one phone camera and is listed as such.
+
+**Serve:** stance (platform or pinpoint) and width, tossing arm straightness, how high it reaches and how long it
+stays up, rhythm, lead and trail knee bend, trunk tilt, shoulder tilt and coil at trophy, hitting elbow angle and
+height, racket drop depth and elbow bend, leg drive, hip rise, whether the feet leave the ground, contact height
+against body height, arm straightness and shoulder-over-shoulder at contact, contact position into the court or
+out to the side (depending on camera angle), swing-up angle, hand and racket-head speed, serve type, travel into
+the court, follow-through.
 
 **Match (every stat is computed per player and per team):** points won, winners, forced and unforced errors,
 winner-to-error ratio; first-serve percentage, points won on first and second serve, aces, double faults,
@@ -123,6 +155,10 @@ No AGPL or research-only components are used, so the stack can be shipped commer
 - When two players overlap in the image, the hitter is marked "check player".
 - Automatic scoring needs the serve to be seen and a clear ending. Other rallies are listed as "not scored".
 - Changing ends: identity follows clothing, so partners in matching outfits can swap labels.
-- Tested on one forehand clip, one 13-second handheld doubles clip, and one 7-second full-court rally. Real
-  matches will surface cases these did not.
+- Serve type is an estimate from contact position and swing-up angle. One camera cannot see spin, so pick the
+  type yourself when you know what you were hitting.
+- Racket angles, the tracer and the plane come from the racket's bounding box. They are good for comparing your
+  own swings from the same camera spot, not as absolute numbers.
+- Tested on one forehand clip, one public serve clip, one 13-second handheld doubles clip, and one 7-second
+  full-court rally. Real matches will surface cases these did not.
 - CPU speed is about 10 frames per second for match tracking. A one-hour match wants a GPU.

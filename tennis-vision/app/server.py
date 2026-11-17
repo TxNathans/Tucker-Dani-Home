@@ -66,10 +66,10 @@ def run_job(job_id: str) -> None:
 
     try:
         params = job["params"]
-        if job["kind"] == "swing":
+        if job["kind"] in ("swing", "serve"):
             from tennisvision.swing.pipeline import analyze_video
             analyze_video(str(folder / job["video"]), str(folder), height_m=params["height_m"], handedness=params["hand"],
-                          progress=progress)
+                          mode=job["kind"], serve_type=params.get("serve_type", "auto"), progress=progress)
         else:
             from tennisvision.match.pipeline import analyze_match
             analyze_match(str(folder / job["video"]), str(folder), fmt=params["format"], names=params["names"],
@@ -86,8 +86,9 @@ def run_job(job_id: str) -> None:
 @app.post("/api/jobs")
 async def create_job(video: UploadFile = File(...), kind: str = Form("swing"), height_cm: float = Form(170.0),
                      hand: str = Form("auto"), format: str = Form("singles"), names: str = Form(""),
-                     hands: str = Form(""), corners: str = Form(""), title: str = Form("")):
-    if kind not in ("swing", "match", "lesson") or format not in ("singles", "doubles") or hand not in ("auto", "right", "left"):
+                     hands: str = Form(""), corners: str = Form(""), title: str = Form(""), serve_type: str = Form("auto")):
+    if (kind not in ("swing", "serve", "match", "lesson") or format not in ("singles", "doubles")
+            or hand not in ("auto", "right", "left") or serve_type not in ("auto", "flat", "slice", "kick")):
         raise HTTPException(400, "Bad options")
     if not 100 <= height_cm <= 230:
         raise HTTPException(400, "Height must be between 100 and 230 cm")
@@ -112,7 +113,7 @@ async def create_job(video: UploadFile = File(...), kind: str = Form("swing"), h
     jobs[job_id] = dict(
         id=job_id, kind=kind, status="queued", progress=0.0, created=time.time(), video=name,
         title=clean(title) or (video.filename or "Video"),
-        params=dict(height_m=height_cm / 100.0, hand=hand, format=format,
+        params=dict(height_m=height_cm / 100.0, hand=hand, format=format, serve_type=serve_type,
                     names=[clean(n) for n in names.split(",")] if names.strip() else None,
                     hands=[h if h in ("right", "left") else "right" for h in hands.split(",")] if hands.strip() else None,
                     corners=corner_list),
@@ -152,6 +153,68 @@ def delete_job(job_id: str):
     jobs.pop(job_id)
     shutil.rmtree(folder, ignore_errors=True)
     return dict(ok=True)
+
+
+def swing_report(job_id: str) -> dict:
+    """The stored report of a finished swing or serve job."""
+    folder = job_dir(job_id)
+    job = jobs.get(job_id)
+    path = folder / "report.json"
+    if job is None or job["status"] != "done" or job["kind"] not in ("swing", "serve") or not path.exists():
+        raise HTTPException(404, "No analysed swing with that id")
+    return json.loads(path.read_text())
+
+
+def swing_name(stroke: str, serve: dict | None) -> str:
+    return f"{serve['type'].capitalize()} serve" if serve and serve.get("type") in ("flat", "slice", "kick") else stroke.capitalize()
+
+
+@app.get("/api/swings")
+def list_swings():
+    """Every analysed swing and serve, newest video first, for the compare picker."""
+    rows = []
+    for job in sorted(jobs.values(), key=lambda j: -j["created"]):
+        if job["status"] != "done" or job["kind"] not in ("swing", "serve"):
+            continue
+        try:
+            report = swing_report(job["id"])
+        except (HTTPException, json.JSONDecodeError):
+            continue
+        for s in report["swings"]:
+            coaching = s.get("coaching") or {}
+            rows.append(dict(ref=f"{job['id']}:{s['index']}", job=job["id"], index=s["index"], title=job["title"], kind=job["kind"],
+                             created=job["created"], name=swing_name(s["stroke"], s.get("serve")), stroke=s["stroke"],
+                             hand=s["hand"], counts=coaching.get("counts"), light=coaching.get("light"),
+                             keyframe=report.get("keyframes", {}).get(f"{s['index']}:contact")))
+    return rows
+
+
+def pick_swing(ref: str) -> tuple[dict, dict, dict]:
+    """ref is "<job id>:<swing number>". Returns the job, its report and the swing."""
+    job_id, _, number = ref.partition(":")
+    report = swing_report(job_id)
+    swing = next((s for s in report["swings"] if str(s["index"]) == number), None)
+    if swing is None:
+        raise HTTPException(404, "That video has no swing with that number")
+    return jobs[job_id], report, swing
+
+
+@app.get("/api/compare")
+def compare(a: str, b: str):
+    """Compare two analysed swings: a is the baseline, b the retest."""
+    from tennisvision.swing.compare import compare_swings
+    if a == b:
+        raise HTTPException(400, "Pick two different swings")
+    (job_a, report_a, swing_a), (job_b, report_b, swing_b) = pick_swing(a), pick_swing(b)
+    if (job_a["kind"] == "serve") != (job_b["kind"] == "serve"):
+        raise HTTPException(400, "Compare a serve with a serve, or a swing with a swing")
+    side = lambda job, report, swing: dict(
+        job=job["id"], index=swing["index"], title=job["title"], kind=job["kind"], created=job["created"],
+        name=swing_name(swing["stroke"], swing.get("serve")), fps=report["video"]["fps"], contact=swing["times"]["contact"],
+        contact_frame=swing["frames"]["contact"], files=report["files"], swing=swing)
+    out = compare_swings(swing_a, swing_b, "Baseline", "Retest")
+    out.update(a=side(job_a, report_a, swing_a), b=side(job_b, report_b, swing_b))
+    return JSONResponse(out)
 
 
 @app.get("/files/{job_id}/{name}")

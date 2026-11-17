@@ -54,3 +54,20 @@ def test_notes_flag_unlike_comparisons():
     assert "different strokes" in c["notes"][0] and "mirror images" in c["notes"][1] and "Coach was hit on the stretch" in c["notes"][2]
     stance = next(d for d in c["differences"] if d["key"] == "stance_type")
     assert stance["sentence"] == "Coach hits from a open stance; Dani from a neutral stance."
+
+
+def test_retest_view_tracks_what_was_being_worked_on():
+    before = swing(contact_in_front=metric("contact_in_front", 2, "work", "cm"), extension=metric("extension", 20, "work", "cm"),
+                   speed_carried=metric("speed_carried", 60, "work", "%"))
+    after = swing(contact_in_front=metric("contact_in_front", 32, "good", "cm"), extension=metric("extension", 30, "work", "cm"),
+                  speed_carried=metric("speed_carried", 59, "work", "%"), head_stability=metric("head_stability", 14, "ok", "cm"))
+    c = compare_swings(before, after, "Baseline", "Retest")
+    worked = {x["key"]: x for x in c["worked_on"]}
+    assert list(worked) == ["contact_in_front", "extension", "speed_carried"]             # the baseline's top three, in order
+    assert worked["contact_in_front"]["verdict"] == "better" and worked["contact_in_front"]["grade_b"] == "on_target"
+    assert worked["extension"]["verdict"] == "better"                                    # still short, but closer to the target
+    assert worked["speed_carried"]["verdict"] == "no_change"
+    assert c["moved_right"] == 2
+    assert c["slipped"] == ["Retest moves the head 4 inches more around contact than Baseline."] and c["also_better"] == []
+    assert c["keep_working"]["lead"] == "Keep working on" and c["keep_working"]["title"] == "Swing out through the ball"
+    assert c["counts"]["a"]["priority"] == 3 and c["counts"]["b"]["priority"] == 2

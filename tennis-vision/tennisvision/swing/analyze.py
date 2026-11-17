@@ -731,6 +731,7 @@ class SwingAnalyzer:
             racket_head_speed=[None if not np.isfinite(v) else round(float(v), 1) for v in self.racket_speed] if self.racket_speed is not None else None,
             elbow=r(_angle(w[:, d["sh"]], w[:, d["el"]], w[:, d["wr"]]), 0),
             knee=r(_angle(w[:, d["hip"]], w[:, d["kn"]], w[:, d["an"]]), 0),
+            knee_off=r(_angle(w[:, self.off["hip"]], w[:, self.off["kn"]], w[:, self.off["an"]]), 0),
             separation=r(self.shoulder_angle - self.pelvis_angle, 0),
         )
 

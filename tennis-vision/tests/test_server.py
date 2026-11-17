@@ -69,3 +69,42 @@ def test_phone_access_info_qr_and_home_screen_files(client, monkeypatch):
     assert 'rel="manifest"' in page and 'rel="apple-touch-icon"' in page
     monkeypatch.setattr(server, "lan_addresses", lambda: [])
     assert client.get("/api/qr").status_code == 404
+
+
+def finished_swing_job(tmp_path, job_id, kind="swing", contact_cm=2, status="work"):
+    """A done job on disk with a one-swing report, as the pipeline leaves it."""
+    from tennisvision.swing.coach import coach
+    metrics = [dict(key="contact_in_front", label="Contact in front of the body", value=contact_cm, unit="cm", phase="Contact",
+                    typical="20-45", status=status, note="")]
+    swing = dict(index=1, stroke="forehand", hand="right", times=dict(contact=1.5), frames=dict(contact=45), metrics=metrics,
+                 coaching=coach([type("M", (), m)() for m in metrics], "forehand"), serve=None)
+    folder = tmp_path / job_id
+    folder.mkdir()
+    (folder / "report.json").write_text(server.json.dumps(dict(
+        kind="swing", video=dict(fps=30.0), swings=[swing], keyframes={"1:contact": "swing1_contact.jpg"},
+        files=dict(overlay="overlay.mp4", clean="clean.mp4", tracks="tracks.json"))))
+    server.jobs[job_id] = dict(id=job_id, kind=kind, status="done", created=float(int(job_id[-1], 16)), title=f"Clip {job_id[-1]}", params={})
+
+
+def test_serve_jobs_carry_the_serve_type(client):
+    job_id = upload(client, kind="serve", serve_type="kick").json()["id"]
+    assert server.jobs[job_id]["kind"] == "serve" and server.jobs[job_id]["params"]["serve_type"] == "kick"
+    assert upload(client, kind="serve", serve_type="cannonball").status_code == 400
+
+
+def test_swings_can_be_listed_and_compared(client, tmp_path):
+    finished_swing_job(tmp_path, "0" * 11 + "1")
+    finished_swing_job(tmp_path, "0" * 11 + "2", contact_cm=30, status="good")
+    finished_swing_job(tmp_path, "0" * 11 + "3", kind="serve")
+    rows = client.get("/api/swings").json()
+    assert [r["ref"] for r in rows] == ["0" * 11 + "3:1", "0" * 11 + "2:1", "0" * 11 + "1:1"]
+    assert rows[1]["name"] == "Forehand" and rows[1]["keyframe"] == "swing1_contact.jpg" and rows[2]["counts"]["priority"] == 1
+    r = client.get("/api/compare", params=dict(a=rows[2]["ref"], b=rows[1]["ref"]))
+    assert r.status_code == 200
+    out = r.json()
+    assert out["a"]["title"] == "Clip 1" and out["b"]["contact"] == 1.5 and out["b"]["files"]["clean"] == "clean.mp4"
+    assert out["worked_on"][0]["key"] == "contact_in_front" and out["worked_on"][0]["verdict"] == "better" and out["moved_right"] == 1
+    assert client.get("/api/compare", params=dict(a=rows[2]["ref"], b=rows[2]["ref"])).status_code == 400
+    assert client.get("/api/compare", params=dict(a=rows[2]["ref"], b=rows[0]["ref"])).status_code == 400      # swing against serve
+    assert client.get("/api/compare", params=dict(a=rows[2]["ref"], b="0" * 11 + "2:9")).status_code == 404
+    assert client.get("/api/compare", params=dict(a="nope:1", b=rows[1]["ref"])).status_code == 404

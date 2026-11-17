@@ -45,13 +45,26 @@ def analyze_video(video_path: str, out_dir: str, height_m: float = 1.70, handedn
         swings = analyzer.analyze()
     crop = crop_box(analyzer, margin=0.8 if serve else 0.45)
     keyframes = render_overlay(video_path, str(out / "overlay.mp4"), analyzer, swings, info,
-                               keyframe_dir=str(out), progress=step(0.8, 1.0), crop=crop)
+                               keyframe_dir=str(out), progress=step(0.8, 1.0), crop=crop, clean_path=str(out / "clean.mp4"))
     cx0, cy0, cx1, cy1 = crop
     norm = lambda p: [round(float((p[0] - cx0) / (cx1 - cx0)), 4), round(float((p[1] - cy0) / (cy1 - cy0)), 4)]
     wrist = analyzer.xy[:, analyzer.dom["wr"]]
     trace = dict(hand=[norm(p) for p in wrist], head=None)
     if analyzer.racket is not None:
         trace["head"] = [norm(p) if ok else None for p, ok in zip(analyzer.racket["head"], analyzer.racket["valid"])]
+    # Everything the app needs to draw its own layers on the clean video: one row per frame, in thousandths of the picture.
+    grid = lambda p: [int(round(1000 * float((p[0] - cx0) / (cx1 - cx0)))), int(round(1000 * float((p[1] - cy0) / (cy1 - cy0))))]
+    tracks = dict(
+        fps=float(f"{info.fps:.4f}"), frames=len(seq.t), aspect=round((cx1 - cx0) / (cy1 - cy0), 4), hand=analyzer.hand,
+        pose=[[v for p in frame for v in grid(p)] for frame in analyzer.xy],
+        hidden=[[int(j) for j in range(33) if seq.detected[i] and seq.vis[i][j] < 0.3] for i in range(len(seq.t))],
+        racket_head=None, racket_box=None,
+    )
+    if analyzer.racket is not None:
+        rk = analyzer.racket
+        tracks["racket_head"] = [grid(p) if ok else None for p, ok in zip(rk["head"], rk["valid"])]
+        tracks["racket_box"] = [grid(b[:2]) + grid(b[2:]) if ok else None for b, ok in zip(rk["boxes"], rk["valid"])]
+    (out / "tracks.json").write_text(json.dumps(tracks, separators=(",", ":")))
     report = dict(
         kind="swing", mode=mode, trace=trace,
         video=dict(width=info.width, height=info.height, fps=round(info.fps, 2), duration=round(info.duration, 2),
@@ -63,7 +76,7 @@ def analyze_video(video_path: str, out_dir: str, height_m: float = 1.70, handedn
         summary=session_summary(swings),
         keyframes=keyframes,
         series=analyzer.series(),
-        files=dict(overlay="overlay.mp4", pose="pose.npz"),
+        files=dict(overlay="overlay.mp4", clean="clean.mp4", tracks="tracks.json", pose="pose.npz"),
         caveats=[
             "One camera: speeds are measured across the camera view, so motion toward or away from the phone is under-counted.",
             "Rotation and joint angles use a single-camera 3D estimate, good to about +/-10-15 degrees. Compare swings filmed from the same spot.",
