@@ -1,0 +1,16 @@
+numpy
+scipy
+opencv-python-headless
+mediapipe
+onnxruntime
+gdown
+segno
+static-ffmpeg    # fetches ffmpeg/ffprobe once if they are not installed
+fastapi
+uvicorn[standard]
+python-multipart
+fpdf2            # PDF reports
+pytest
+# PyTorch (ball tracker). CPU build: pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch
+httpx2    # test client for the web API tests

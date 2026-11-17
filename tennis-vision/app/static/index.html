@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Tracer Tennis">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#e7eaf0">
+<link rel="manifest" href="/static/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/static/icon-180.png">
+<link rel="icon" type="image/png" href="/static/icon-192.png">
+<link rel="preload" href="/static/fonts/dm-sans.woff2" as="font" type="font/woff2" crossorigin>
+<title>Tracer Tennis</title>
+<script>
+  try { if (localStorage.getItem('tt-theme') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (e) {}
+</script>
+<link rel="stylesheet" href="/static/app.css?v=6">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="#/" aria-label="Tracer Tennis home">
+    <img class="only-light" src="/static/logo-mark-light.png" alt="" width="42" height="30"><img class="only-dark" src="/static/logo-mark-dark.png" alt="" width="42" height="30">
+    <img class="word only-light" src="/static/wordmark-light.png" alt="Tracer Tennis" width="101" height="25"><img class="word only-dark" src="/static/wordmark-dark.png" alt="Tracer Tennis" width="101" height="25">
+  </a>
+  <nav aria-label="Main">
+    <a href="#/" data-nav="home">Home</a><a href="#/new/swing" data-nav="swing">Swing</a><a href="#/new/serve" data-nav="serve">Serve</a>
+    <a href="#/compare" data-nav="compare">Compare</a><a href="#/new/lesson" data-nav="lesson">Lesson</a><a href="#/new/match" data-nav="match">Match</a>
+  </nav>
+  <button class="ibtn" id="help" title="How to use this" aria-label="How to use this"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.6 2.3c-.8.5-1.2 1-1.2 1.9"/><path d="M12 16.8v.1"/></svg></button>
+  <button class="ibtn" id="theme" title="Light or dark" aria-label="Switch between light and dark"></button>
+</header>
+<main id="view"></main>
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true"></aside>
+<script src="/static/stage.js?v=6"></script>
+<script src="/static/app.js?v=6"></script>
+</body>
+</html>
