@@ -31,16 +31,29 @@ Five modes:
 
 ## Install it as an app
 
-**On the computer (Windows or Mac)**
+**On the computer (Windows PC, or a Mac with Apple Silicon)**
 
-1. Install Python 3.10 or newer from python.org if it is not there already (on Windows tick "Add python.exe to PATH").
-2. Download this folder and unzip it.
-3. Double-click **Start Tracer Tennis.bat** (Windows) or **Start Tracer Tennis.command** (Mac).
+1. Download this folder as a zip and unzip it (Windows: right-click the zip, Extract All).
+2. Double-click **Start Tracer Tennis.bat** (Windows) or **Start Tracer Tennis.command** (Mac).
+   - Windows may show a blue "Windows protected your PC" box: click More info, then Run anyway.
+   - Mac: the first time, macOS blocks it. Open System Settings, Privacy & Security, scroll down and click
+     Open Anyway next to Start Tracer Tennis, then double-click it again.
+3. If Python is missing, the window says so. On Windows it offers to install Python 3.13 for you (press Y). On a Mac
+   it opens the download page: install Python 3.13 (the "macOS 64-bit universal2 installer"), then double-click again.
 
-The first start takes 5 to 10 minutes: it builds a private Python environment in `.venv` and downloads the tracking
-libraries (about 1.5 GB) and, on first use, the model weights (about 80 MB). After that it starts in a few seconds
-and opens the app in its own window. Leave the black terminal window open while you use it; close it to stop.
-If ffmpeg is not installed it is fetched automatically.
+The first start takes 5 to 10 minutes: it downloads the tracking libraries (about 1.5 GB) and, on first use, the
+models (about 70 MB). After that it starts in a few seconds and opens the app in its own window. Leave the black
+terminal window open while you use it; close it to stop. Double-clicking again while it runs just reopens the window.
+
+Python 3.12, 3.13 or 3.14 is needed (the tracking libraries have no builds for 3.15 yet); the launcher finds one if
+it is installed. Intel Macs cannot run it, because the body tracker is only made for Apple Silicon Macs and Windows.
+If PyTorch cannot be installed, Swing, Serve and Compare still work and Lesson and Match say why they cannot.
+
+**Where things are kept, and updating.** The libraries, models and saved videos live in one folder per computer,
+not in the app folder: `%LOCALAPPDATA%\TracerTennis` on Windows, `~/Library/Application Support/Tracer Tennis` on a
+Mac. To update, unzip the new version anywhere and double-click it: it starts in seconds, shows the same saved
+videos, and keeps the same address so the iPhone icon still works. Saved videos from an older copy unzipped in the
+same folder are copied over the first time. To remove everything, delete that folder and the app folder.
 
 **On the iPhone**
 

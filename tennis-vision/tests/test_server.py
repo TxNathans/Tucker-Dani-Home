@@ -150,3 +150,24 @@ def test_report_pdf_and_numbers_download(client, tmp_path):
     assert lines[0].startswith("Part of the swing,Number,Value") and "Contact in front of the body,2,cm,20-45,Priority,seen directly" in lines[1]
     assert client.get(f"/api/jobs/{job_id}/report.pdf", params=dict(swing=7)).status_code == 404
     assert client.get(f"/api/jobs/{job_id}/shots.csv").status_code == 404
+
+
+def test_missing_ball_tracking_gives_a_clear_message(client, tmp_path, monkeypatch):
+    job_id = upload(client, kind="match").json()["id"]
+
+    def no_torch(*a, **k):
+        raise ModuleNotFoundError("No module named 'torch'", name="torch")
+    import tennisvision.match.pipeline as mp
+    monkeypatch.setattr(mp, "analyze_match", no_torch)
+    server.run_job(job_id)
+    job = server.jobs[job_id]
+    assert job["status"] == "error" and job["error"].startswith("Lesson and Match need PyTorch")
+    assert isinstance(client.get("/api/info").json()["ball_tracking"], bool)
+
+
+def test_saved_videos_live_where_the_launcher_says(monkeypatch, tmp_path):
+    from tennisvision import paths
+    monkeypatch.setenv("TRACER_TENNIS_HOME", str(tmp_path))
+    assert paths.jobs_dir() == tmp_path / "data" / "jobs" and paths.model_dir() == tmp_path / "models"
+    monkeypatch.delenv("TRACER_TENNIS_HOME")
+    assert paths.jobs_dir() == paths.PROJECT / "data" / "jobs"

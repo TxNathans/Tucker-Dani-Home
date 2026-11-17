@@ -307,7 +307,10 @@
         <p id="msg" class="err" style="margin-top:10px"></p>
         <button id="go" class="btn primary wide" style="margin-top:8px">Analyze</button>
       </form></div>`;
-    if (isMatch) setupMatchForm(isLesson);
+    if (isMatch) {
+      setupMatchForm(isLesson);
+      api('/api/info').then(info => { if (info.ball_tracking === false && $('#msg')) $('#msg').textContent = 'Lesson and Match need PyTorch, which is not installed on this computer. Close Tracer Tennis and start it again to retry the install.'; }).catch(() => {});
+    }
     $('#f').addEventListener('submit', async ev => {
       ev.preventDefault();
       const file = $('#video').files[0];

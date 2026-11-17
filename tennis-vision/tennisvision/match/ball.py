@@ -5,8 +5,9 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+from ..paths import model_dir
 
-MODEL_DIR = Path(__file__).resolve().parents[2] / "models"
+MODEL_DIR = model_dir()
 WEIGHTS = MODEL_DIR / "wasb_tennis_best.pth.tar"
 WEIGHTS_GDRIVE_ID = "14AeyIOCQ2UaQmbZLNQJa1H_eSwxUXk7z"
 IN_W, IN_H = 512, 288

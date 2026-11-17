@@ -7,8 +7,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+from ..paths import model_dir
 
-MODEL_DIR = Path(__file__).resolve().parents[2] / "models"
+MODEL_DIR = model_dir()
 YOLOX_URL = "https://github.com/Megvii-BaseDetection/YOLOX/releases/download/0.1.1rc0/yolox_{v}.onnx"
 PERSON, RACKET = 0, 38
 INPUT = 640

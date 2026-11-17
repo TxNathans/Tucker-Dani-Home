@@ -11,8 +11,9 @@ os.environ.setdefault("GLOG_minloglevel", "3")
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
 
 from .video import VideoInfo, iter_frames, probe  # noqa: E402
+from .paths import model_dir
 
-MODEL_DIR = Path(__file__).resolve().parent.parent / "models"
+MODEL_DIR = model_dir()
 MODEL_URL = ("https://storage.googleapis.com/mediapipe-models/pose_landmarker/"
              "pose_landmarker_{v}/float16/latest/pose_landmarker_{v}.task")
 

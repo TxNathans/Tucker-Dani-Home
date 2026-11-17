@@ -15,12 +15,13 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+from tennisvision.paths import jobs_dir
 from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 ROOT = Path(__file__).resolve().parent
-DATA = ROOT.parent / "data" / "jobs"
+DATA = jobs_dir()       # inside the project when run from source; the per-computer folder when started by the launcher
 DATA.mkdir(parents=True, exist_ok=True)
 ID_RE = re.compile(r"^[0-9a-f]{12}$")
 SAFE_NAME = re.compile(r"[^A-Za-z0-9 _.-]+")
@@ -82,6 +83,8 @@ def run_job(job_id: str) -> None:
     except Exception as exc:                       # report the failure to the phone instead of dying silently
         traceback.print_exc()
         message = str(exc) if isinstance(exc, ValueError) else f"Analysis failed: {type(exc).__name__}: {exc}"
+        if isinstance(exc, ModuleNotFoundError) and (exc.name or "").split(".")[0] == "torch":
+            message = NO_BALL_TRACKING
         job.update(status="error", error=message, finished=time.time())
     save_meta(job_id)
 
@@ -326,6 +329,15 @@ def get_file(job_id: str, name: str, download: int = 0):
     return FileResponse(path)
 
 
+NO_BALL_TRACKING = ("Lesson and Match need PyTorch to follow the ball, and it is not installed on this computer. "
+                    "Close Tracer Tennis and start it again to retry the install. Swing, Serve and Compare work without it.")
+
+
+def ball_tracking() -> bool:
+    import importlib.util
+    return importlib.util.find_spec("torch") is not None
+
+
 def lan_addresses() -> list[str]:
     """IPv4 addresses other devices can use to reach this computer (home Wi-Fi first, then VPNs such as Tailscale)."""
     found: list[str] = []
@@ -347,7 +359,7 @@ def lan_addresses() -> list[str]:
 
 @app.get("/api/info")
 def info():
-    return dict(computer=socket.gethostname(), urls=[f"http://{a}:{PORT}" for a in lan_addresses()])
+    return dict(computer=socket.gethostname(), urls=[f"http://{a}:{PORT}" for a in lan_addresses()], ball_tracking=ball_tracking())
 
 
 @app.get("/api/qr")
