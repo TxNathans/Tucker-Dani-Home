@@ -5,6 +5,8 @@ and the measurement behind it for coaches.
 """
 from __future__ import annotations
 
+from .cues import cue_for
+
 CATEGORIES = [
     ("feet", "Feet and stance", ("stance_type", "front_foot_angle", "back_foot_angle", "back_foot_pivot", "step_in", "stance_width")),
     ("load", "Turn and load", ("prep_time", "shoulder_turn", "separation", "knee_bend_dom", "leg_drive", "sequence")),
@@ -24,7 +26,7 @@ GRADE_WORDS = {"strength": "Strength", "on_target": "On target", "building": "Bu
 PROBLEMS = {
     "contact_in_front": lambda v: "You're meeting the ball too close to your body.",
     "extension": lambda v: "Your swing stops short of the target.",
-    "speed_carried": lambda v: "You're braking as you meet the ball.",
+    "speed_carried": lambda v: "Your swing slows down right at the ball.",
     "weight_through": lambda v: "Your weight is falling back off the shot.",
     "chest_lead": lambda v: "You're leaning back at contact.",
     "shoulder_turn": lambda v: "Your shoulders don't turn far enough.",
@@ -49,7 +51,7 @@ PROBLEMS = {
 
 # key -> (meter start, meter end, target low, target high)
 METERS = {
-    "contact_in_front": (-20, 70, 20, 50), "extension": (0, 90, 40, 70), "speed_carried": (40, 110, 85, 105),
+    "contact_in_front": (-20, 70, 20, 50), "extension": (0, 90, 40, 70), "speed_carried": (30, 110, 75, 105),
     "weight_through": (-15, 35, 5, 25), "chest_lead": (-20, 35, 0, 20), "shoulder_turn": (0, 130, 90, 110),
     "hip_turn": (0, 110, 45, 80), "separation": (-10, 50, 20, 40), "knee_bend_dom": (90, 180, 110, 145),
     "knee_bend_off": (90, 180, 110, 145), "leg_drive": (0, 50, 15, 40), "front_foot_angle": (0, 130, 20, 70),
@@ -65,22 +67,29 @@ METERS = {
     "lead_knee_back": (90, 180, 120, 160), "lead_knee_contact": (90, 180, 135, 175), "lead_brace": (-30, 50, 5, 30),
     "trail_knee_back": (90, 180, 110, 145), "trail_knee_contact": (90, 180, 130, 170), "trail_drive": (0, 50, 15, 40),
     "weight_on_lead_back": (0, 100, 25, 50), "weight_on_lead": (0, 120, 55, 85),
-    "racket_angle_back": (-30, 90, 20, 80), "racket_angle_low": (-90, 30, -60, -20), "racket_angle_contact": (-60, 60, -25, 15),
+    "racket_angle_back": (-30, 90, 20, 80), "racket_angle_low": (-90, 30, -90, -20), "racket_angle_contact": (-60, 60, -25, 15),
     "racket_lag": (0, 120, 50, 90), "approach_angle": (-10, 70, 15, 35), "swing_plane": (0, 90, 20, 45),
 }
 
 # A number this far past its target counts as a strength rather than just on target: key -> (direction, value)
 STRENGTH_AT = {
-    "contact_in_front": (1, 35), "extension": (1, 55), "speed_carried": (1, 95), "shoulder_turn": (1, 95), "separation": (1, 30),
+    "contact_in_front": (1, 35), "extension": (1, 55), "speed_carried": (1, 90), "shoulder_turn": (1, 95), "separation": (1, 30),
     "knee_bend_dom": (-1, 125), "head_stability": (-1, 4), "step_in": (1, 30), "leg_drive": (1, 25), "follow_length": (1, 1.4),
     "weight_through": (1, 12), "back_foot_pivot": (1, 45), "racket_drop": (1, 30), "trunk_lean": (-1, 8),
 }
 
 
-def grade_of(key: str, value, status: str, situational: bool = False, strength_at: dict | None = None) -> str:
-    """The five grades used everywhere: strength, on_target, building, priority, not_graded."""
+def grade_of(key: str, value, status: str, situational: bool = False, strength_at: dict | None = None,
+             confidence: str = "high") -> str:
+    """The five grades used everywhere: strength, on_target, building, priority, not_graded.
+
+    A number the camera could not see clearly is not graded. A number that is an estimate can be Building but never
+    Priority: the one thing a player is told to fix first has to rest on something seen directly.
+    """
+    if confidence == "low":
+        return "not_graded"
     if status == "work":
-        return "building" if situational else "priority"
+        return "building" if situational or confidence != "high" else "priority"
     if status == "ok":
         return "building"
     if status != "good":
@@ -119,9 +128,9 @@ def _tips() -> dict:
             why="The ball stays on the strings longer and goes where you aim when the racket keeps travelling along the target line. Cutting across early costs depth and control.",
             cue="Hit through three balls in a row. Imagine two more balls lined up behind the real one and swing through all of them.",
             drill="Stand a cone or racket cover an arm's length in front of your contact point. Shadow-swing so the racket passes over it before it comes around your shoulder. 15 reps, then 15 with a fed ball.")),
-        "speed_carried": (9, lambda v, s: dict(
+        "speed_carried": (6, lambda v, s: dict(
             title="Accelerate past the ball, not up to it",
-            saw=f"Your hand had slowed to {v:.0f}% of its speed a blink after contact. The swing was braking as it met the ball.",
+            saw=f"Just after contact your hand was down to {v:.0f}% of the speed it had at the ball. Some drop is normal; this much suggests the swing was easing off.",
             why="A racket that is still speeding up at contact is stable and heavy. One that is slowing down twists in your hand and the ball lands short.",
             cue="Swoosh after the ball. The loudest part of the swing should be in front of you, not beside you.",
             drill="Hold the racket upside down by the throat and swing so the whoosh sound comes after your contact point. Then hit 10 balls trying to copy that sound.")),
@@ -298,6 +307,13 @@ def coach(metrics: list, stroke: str, book: dict | None = None) -> dict:
     strength_at = book.get("strength_at", STRENGTH_AT)
     get = (lambda m, k: m[k]) if metrics and isinstance(metrics[0], dict) else (lambda m, k: getattr(m, k))
     by_key = {get(m, "key"): m for m in metrics}
+
+    def sure(m) -> str:
+        try:
+            return get(m, "confidence") or "high"
+        except (KeyError, AttributeError):
+            return "high"
+    confidence = {k: sure(m) for k, m in by_key.items()}
     value = lambda key: get(by_key[key], "value") if key in by_key else None
 
     stretched = False
@@ -309,7 +325,8 @@ def coach(metrics: list, stroke: str, book: dict | None = None) -> dict:
 
     categories = []
     for cid, name, keys in CATEGORIES:
-        rows = [(k, get(by_key[k], "status")) for k in keys if k in by_key and get(by_key[k], "status") in POINTS]
+        rows = [(k, get(by_key[k], "status")) for k in keys
+                if k in by_key and get(by_key[k], "status") in POINTS and confidence[k] != "low"]
         if not rows:
             continue
         score = round(sum(POINTS[s] for _, s in rows) / len(rows))
@@ -322,7 +339,7 @@ def coach(metrics: list, stroke: str, book: dict | None = None) -> dict:
     fixes = []
     for key, m in by_key.items():
         status = get(m, "status")
-        if key not in tips or status not in ("work", "ok"):
+        if key not in tips or status not in ("work", "ok") or confidence[key] == "low":
             continue
         val = get(m, "value")
         if not isinstance(val, (int, float)):
@@ -331,26 +348,34 @@ def coach(metrics: list, stroke: str, book: dict | None = None) -> dict:
             val = 0
         priority, build = tips[key]
         situational = stretched and key in SITUATIONAL
-        rank = priority * (1.0 if status == "work" else 0.45) * (0.6 if situational else 1.0)
+        rank = priority * (1.0 if status == "work" else 0.45) * (0.6 if situational else 1.0) * (1.0 if confidence[key] == "high" else 0.7)
         card = build(val, stroke)
+        book_cue = cue_for(key, val, stroke)
+        if book_cue:
+            card.update(cue_more=card["cue"], cue=book_cue["cue"], alts=book_cue["alts"], check=book_cue["check"])
+        else:
+            card.update(cue_more="", alts=[], check="")
         card.update(key=key, severity="fix" if status == "work" else "polish", category=category_of.get(key, ""),
                     situational=situational, rank=round(rank, 2), problem=PROBLEMS[key](val),
-                    grade=grade_of(key, val, status, situational, strength_at), value=get(m, "value"), unit=get(m, "unit"),
-                    label=get(m, "label"),
+                    grade=grade_of(key, val, status, situational, strength_at, confidence[key]), value=get(m, "value"),
+                    unit=get(m, "unit"), confidence=confidence[key], label=get(m, "label"),
                     measured=f"{get(m, 'label')}: {val if key != 'sequence' else get(m, 'value')} {get(m, 'unit')}".strip(),
                     typical=get(m, "typical"))
         fixes.append(card)
-    fixes.sort(key=lambda c: -c["rank"])
+    fixes.sort(key=lambda c: (c["grade"] != "priority", -c["rank"]))      # anything seen directly and clearly off comes first
 
-    grades = {k: grade_of(k, get(m, "value"), get(m, "status"), stretched and k in SITUATIONAL, strength_at)
+    grades = {k: grade_of(k, get(m, "value"), get(m, "status"), stretched and k in SITUATIONAL, strength_at, confidence[k])
               for k, m in by_key.items()}
     strengths = [dict(key=k, text=PRAISE[k], category=category_of.get(k, ""), grade=grades[k], value=get(m, "value"),
-                      unit=get(m, "unit")) for k, m in by_key.items() if get(m, "status") == "good" and k in PRAISE]
-    strengths.sort(key=lambda w: (w["grade"] != "strength", -tips.get(w["key"], (0,))[0]))
+                      unit=get(m, "unit")) for k, m in by_key.items()
+                 if get(m, "status") == "good" and k in PRAISE and confidence[k] != "low"]
+    strengths.sort(key=lambda w: (confidence[w["key"]] != "high", w["grade"] != "strength", -tips.get(w["key"], (0,))[0]))
     counts = dict(priority=sum(g == "priority" for g in grades.values()), building=sum(g == "building" for g in grades.values()),
                   on_target=sum(g in ("on_target", "strength") for g in grades.values()),
                   strength=sum(g == "strength" for g in grades.values()))
     counts["graded"] = counts["priority"] + counts["building"] + counts["on_target"]
+    counts["estimates"] = sum(confidence[k] == "estimate" and g != "not_graded" for k, g in grades.items())
+    counts["unclear"] = sum(c == "low" for c in confidence.values())
     light = "red" if counts["priority"] else "yellow" if counts["building"] else "green"
     meters = {k: dict(min=v[0], max=v[1], lo=v[2], hi=v[3]) for k, v in METERS.items() if k in by_key}
 
@@ -364,4 +389,4 @@ def coach(metrics: list, stroke: str, book: dict | None = None) -> dict:
                "Film a ball hit from a set position to see your normal swing.") if stretched else ""
     return dict(overall=overall, band=band(overall) if overall is not None else None, headline=headline, context=context,
                 stretched=stretched, categories=categories, fixes=fixes, strengths=strengths,
-                grades=grades, counts=counts, light=light, meters=meters)
+                grades=grades, counts=counts, light=light, meters=meters, confidence=confidence)

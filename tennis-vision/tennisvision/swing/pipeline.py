@@ -9,6 +9,7 @@ from pathlib import Path
 from ..pose import extract_pose
 from ..video import probe, read_audio
 from .analyze import SwingAnalyzer, session_summary
+from .confidence import video_checks, view_of
 from .racket import track_racket
 from .serve import ServeAnalyzer, serve_hand
 from .render import crop_box, render_overlay
@@ -73,6 +74,8 @@ def analyze_video(video_path: str, out_dir: str, height_m: float = 1.70, handedn
                     camera_distance_m=round(analyzer.distance_m, 1),
                     racket_seen_pct=round(100 * float(analyzer.racket["seen"].mean())) if analyzer.racket else None),
         swings=[asdict(s) for s in swings],
+        checks=video_checks(analyzer, info, swings, float(seq.detected.mean())),
+        view=view_of(analyzer, swings[0])[0] if swings else None,
         summary=session_summary(swings),
         keyframes=keyframes,
         series=analyzer.series(),

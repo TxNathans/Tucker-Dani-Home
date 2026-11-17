@@ -61,5 +61,30 @@ def test_stretched_ball_softens_balance_but_not_technique():
 
 def test_backhand_gets_its_own_cue():
     turn = metric("shoulder_turn", 40, "work", "deg")
-    assert "Chin on your front shoulder" in coach(base(shoulder_turn=turn), "backhand")["fixes"][0]["cue"]
-    assert "Point your front shoulder" in coach(base(shoulder_turn=turn), "forehand")["fixes"][0]["cue"]
+    back, fore = coach(base(shoulder_turn=turn), "backhand")["fixes"][0], coach(base(shoulder_turn=turn), "forehand")["fixes"][0]
+    assert back["cue"] == "Chin on your front shoulder." and fore["cue"] == "Show your back to the net."
+    assert len(fore["alts"]) == 2 and fore["check"].startswith("With the racket back") and "Point your front shoulder" in fore["cue_more"]
+
+
+def test_every_fix_has_a_short_cue_two_alternatives_and_a_self_check():
+    from tennisvision.swing.coach import _tips
+    from tennisvision.swing.cues import cue_for
+    from tennisvision.swing.serve_coach import SERVE_TIPS
+    for key in list(_tips()) + list(SERVE_TIPS):
+        for value in (10, 60):
+            c = cue_for(key, value, "forehand")
+            assert c is not None, key
+            assert len(c["cue"].split()) <= 7 and len(c["alts"]) == 2 and c["check"].endswith("."), (key, c)
+
+
+def test_an_estimate_is_never_the_priority_and_an_unclear_number_is_not_graded():
+    seen = metric("trunk_lean", 45, "work", "deg")
+    guess = dict(metric("contact_in_front", 2, "work", "cm"), confidence="estimate")
+    hidden = dict(metric("front_foot_angle", 120, "work", "deg"), confidence="low")
+    c = coach([seen, guess, hidden], "forehand")
+    assert c["grades"] == dict(trunk_lean="priority", contact_in_front="building", front_foot_angle="not_graded")
+    assert [f["key"] for f in c["fixes"]] == ["trunk_lean", "contact_in_front"]          # seen directly outranks the estimate
+    assert c["counts"]["graded"] == 2 and c["counts"]["unclear"] == 1 and c["counts"]["estimates"] == 1
+    assert all("front_foot_angle" not in cat["keys"] for cat in c["categories"])
+    only_guess = coach([guess], "forehand")
+    assert only_guess["light"] == "yellow" and only_guess["fixes"][0]["grade"] == "building"

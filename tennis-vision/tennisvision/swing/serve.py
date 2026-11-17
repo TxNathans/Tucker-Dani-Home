@@ -14,6 +14,7 @@ from .. import pose as P
 from ..pose import PoseSequence
 from .analyze import Metric, Swing, SwingAnalyzer, _angle
 from .coach import coach
+from .confidence import assess
 from .serve_coach import SERVE_BOOK
 
 SERVE_PHASES = [["start", "Start"], ["toss", "Toss"], ["trophy", "Trophy"], ["racket_drop", "Racket drop"],
@@ -283,6 +284,7 @@ class ServeAnalyzer:
 
         swing.serve = dict(type=kind, declared=self.declared, estimate=estimate, confidence=confidence, basis=basis,
                            view="side-on" if side_on else "behind or front-on", stance=stance, lead=self.lead, targets=TYPE_TARGETS)
+        assess(swing, an)
         swing.coaching = coach(swing.metrics, "serve", SERVE_BOOK)
         return swing
 

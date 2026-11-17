@@ -10,7 +10,7 @@
   const nice = s => esc(String(s).replace(/_/g, ' '));
   const cap = s => s ? s[0].toUpperCase() + s.slice(1) : '';
   const MPH = 2.237;
-  let pollTimer = null, pickedCorners = null, deck = null;
+  let pollTimer = null, pickedCorners = null, deck = null, saveCtx = null;
 
   async function api(path, opts) {
     const r = await fetch(path, opts);
@@ -45,18 +45,119 @@
     return `<div class="dial"><svg viewBox="0 0 168 90" role="img" aria-label="${hit} of ${total} on target">${ticks}</svg><div class="mid"><b class="num">${hit}/${total}</b><span>on target</span></div></div>`;
   }
   function countsBlock(c) {
-    return `<div class="counts">${['priority', 'building', 'on_target', 'strength'].map(g => `<div>${mark(g)}${GRADES[g]}<b class="num">${c[g] ?? 0}</b></div>`).join('')}</div>`;
+    const n = {priority: c.priority || 0, building: c.building || 0, on_target: (c.on_target || 0) - (c.strength || 0), strength: c.strength || 0};      // strengths are counted inside on target
+    return `<div class="counts">${['priority', 'building', 'on_target', 'strength'].map(g => `<div>${mark(g)}${GRADES[g]}<b class="num">${n[g]}</b></div>`).join('')}</div>`;
   }
 
+  // ---------- small helpers: toast, extra icons ----------
+  const svgi = d => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.900" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  Object.assign(ICON, {
+    star: svgi('<path d="M12 3.600l2.600 5.300 5.800.800-4.200 4.100 1 5.800-5.200-2.700-5.200 2.700 1-5.800-4.200-4.100 5.800-.800z"/>'),
+    help: svgi('<circle cx="12" cy="12" r="9"/><path d="M9.600 9.300a2.500 2.500 0 1 1 3.600 2.300c-.800.500-1.200 1-1.200 1.900"/><path d="M12 16.800v.100"/>'),
+    doc: svgi('<path d="M7 3.500h7l4 4V20.500H7z"/><path d="M14 3.500v4h4M9.500 12.500h5M9.500 16h5"/>'),
+    film: svgi('<rect x="3.500" y="5.500" width="17" height="13" rx="2"/><path d="M10 9.500v5l4.500-2.500z" fill="currentColor"/>'),
+    image: svgi('<rect x="3.500" y="5" width="17" height="14" rx="2"/><circle cx="9" cy="10" r="1.600"/><path d="M4.500 17l5-4.500 3.500 3 2.500-2 4 3.500"/>'),
+    table: svgi('<rect x="3.500" y="5" width="17" height="14" rx="2"/><path d="M3.500 10h17M3.500 14.500h17M9.500 5v14"/>'),
+  });
+  let toastTimer = null;
+  TT.toast = text => {
+    let el = $('#toast');
+    if (!el) { el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
+    el.textContent = text; el.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+  };
+  const patchJob = (id, body) => api('/api/jobs/' + id, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
+
   // ---------- drawer ----------
-  function openDrawer(html) {
-    drawer.innerHTML = `<div class="rowline spread"><span class="eyebrow">Details</span><button class="ibtn" data-close aria-label="Close">${ICON.close}</button></div>${html}`;
+  function openDrawer(html, label = 'Details') {
+    drawer.scrollTop = 0;
+    drawer.innerHTML = `<div class="rowline spread dhead"><span class="eyebrow">${label}</span><button class="ibtn" data-close aria-label="Close">${ICON.close}</button></div>${html}`;
     drawer.classList.add('open'); scrim.classList.add('open'); drawer.setAttribute('aria-hidden', 'false');
   }
   function closeDrawer() { drawer.classList.remove('open'); scrim.classList.remove('open'); drawer.setAttribute('aria-hidden', 'true'); }
   scrim.addEventListener('click', closeDrawer);
   drawer.addEventListener('click', ev => { if (ev.target.closest('[data-close]')) closeDrawer(); });
   document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeDrawer(); });
+
+  // ---------- save and share ----------
+  let marksTimer = null, marksWaiting = null, notesTimer = null, toldMarks = false;
+  function sendMarks() {
+    clearTimeout(marksTimer);
+    if (!marksWaiting) return;
+    const [id, marks] = marksWaiting;
+    marksWaiting = null;
+    // keepalive lets the request finish even if the page is being closed or reloaded
+    fetch(`/api/jobs/${id}/marks`, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(marks), keepalive: true})
+      .then(r => { if (!r.ok) throw new Error(); if (!toldMarks) { toldMarks = true; TT.toast('Drawings are saved with this video'); } })
+      .catch(() => TT.toast('Could not save the drawing'));
+  }
+  function saveMarks(job, marks) {
+    job.marks = marks.map(stage => stage.map(m => ({tool: m.tool, color: m.color, pts: m.pts})));
+    marksWaiting = [job.id, job.marks];
+    clearTimeout(marksTimer);
+    marksTimer = setTimeout(sendMarks, 350);
+  }
+  window.addEventListener('pagehide', sendMarks);
+  function openSave(job, opts = {}) {
+    saveCtx = {job, opts};
+    const id = job.id, isSwing = job.kind === 'swing' || job.kind === 'serve', q = opts.swing ? `?swing=${opts.swing}` : '';
+    const link = (icon, title, sub, href) => `<a class="saverow" href="${href}" download><span class="ibtn">${icon}</span><span class="grow"><b>${title}</b><span class="tiny muted">${sub}</span></span></a>`;
+    const act = (icon, title, sub, name) => `<button class="saverow" data-save="${name}"><span class="ibtn">${icon}</span><span class="grow"><b>${title}</b><span class="tiny muted">${sub}</span></span></button>`;
+    openDrawer(`<h3>Save and share</h3>
+      <p class="small ink2">This video and its read are saved on this computer automatically. Find them any time under Home.</p>
+      <div class="lbl">Name</div><div class="rowline"><input type="text" id="svName" maxlength="80" value="${esc(job.title)}" aria-label="Name of this video"><button class="btn sm" data-save="name">Rename</button></div>
+      <div style="margin-top:10px"><button class="switch ${job.starred ? 'on' : ''}" data-save="star" aria-pressed="${!!job.starred}"><i></i>Keep in favourites</button></div>
+      <div class="lbl">Notes</div><textarea id="svNotes" rows="4" maxlength="4000" placeholder="What you worked on, what to try next" aria-label="Notes">${esc(job.notes || '')}</textarea>
+      <div class="tiny muted" id="svState">Notes save as you type${isSwing ? ' and print on the report' : ''}.</div>
+      <div class="lbl">Take it with you</div>
+      ${isSwing ? link(ICON.doc, 'Report', 'A PDF with the read, the cue, the drill and every number', `/api/jobs/${id}/report.pdf${q}`) : ''}
+      ${link(ICON.film, 'Marked-up video', 'The video with the tracking drawn on it', `/files/${id}/overlay.mp4?download=1`)}
+      ${act(ICON.image, 'Picture of this frame', 'What is on the video right now, drawings included', 'picture')}
+      ${isSwing ? link(ICON.table, 'Numbers', 'Every number as a spreadsheet file', `/api/jobs/${id}/numbers.csv${q}`) : link(ICON.table, 'Shots', 'Every shot as a spreadsheet file', `/api/jobs/${id}/shots.csv`)}
+      <div class="lbl">Remove</div><button class="btn danger" data-save="delete">Delete this video</button>`, 'Save');
+  }
+  drawer.addEventListener('click', async ev => {
+    if (ev.target.closest('a.saverow')) { TT.toast('Saving to your downloads'); return; }
+    const b = ev.target.closest('[data-save]');
+    if (!b || !saveCtx) return;
+    const {job, opts} = saveCtx, what = b.dataset.save;
+    try {
+      if (what === 'name') {
+        const out = await patchJob(job.id, {title: $('#svName').value});
+        job.title = out.title; $('#svName').value = out.title; if (opts.onTitle) opts.onTitle(out.title); TT.toast('Renamed');
+      } else if (what === 'star') {
+        const out = await patchJob(job.id, {starred: !job.starred});
+        job.starred = out.starred; b.classList.toggle('on', out.starred); b.setAttribute('aria-pressed', out.starred); TT.toast(out.starred ? 'Added to favourites' : 'Removed from favourites');
+      } else if (what === 'picture') { closeDrawer(); if (deck) deck.savePicture(); }
+      else if (what === 'delete') {
+        if (!b.classList.contains('sure')) { b.classList.add('sure'); b.textContent = 'Tap again to delete it for good'; return; }
+        await api('/api/jobs/' + job.id, {method: 'DELETE'}); closeDrawer(); TT.toast('Deleted'); location.hash = '#/';
+      }
+    } catch (e) { TT.toast(e.message); }
+  });
+  drawer.addEventListener('input', ev => {
+    if (ev.target.id !== 'svNotes' || !saveCtx) return;
+    const job = saveCtx.job, text = ev.target.value;
+    if ($('#svState')) $('#svState').textContent = 'Saving...';
+    clearTimeout(notesTimer);
+    notesTimer = setTimeout(() => patchJob(job.id, {notes: text}).then(() => { job.notes = text; if ($('#svState')) $('#svState').textContent = 'Notes saved.'; })
+      .catch(() => { if ($('#svState')) $('#svState').textContent = 'Could not save the notes. Check the computer is still running the app.'; }), 600);
+  });
+
+  function openHelp() {
+    const part = (title, body) => `<div class="lbl">${title}</div><p class="small">${body}</p>`;
+    openDrawer(`<h3>How to use Tracer Tennis</h3>
+      ${part('1. Film', 'Whole body in the picture, phone held still, from the side or from behind. 60 fps or Slo-mo gives the sharpest read. Sound on, so contact can be heard.')}
+      ${part('2. Upload', 'Pick Swing, Serve, Lesson or Match at the top, choose the video and tap Analyze. You can leave the page while it works.')}
+      ${part('3. Read it', 'The headline is the one thing to work on first. The blue box is the cue to think about. "Show me" plays that moment in slow motion and rings the body part on the video.')}
+      ${part('The grades', `${mark('strength')} <b>Strength</b> well past the target. ${mark('on_target')} <b>On target</b> inside the range. ${mark('building')} <b>Building</b> a little outside. ${mark('priority')} <b>Priority</b> clearly outside and seen directly. ${mark('not_graded')} <b>Not graded</b> depends on the shot, or could not be seen clearly.`)}
+      ${part('Estimates', 'A number marked "est." is worked out in 3D from one camera, read from the racket\'s outline, or timed between frames. It is a good guide for comparing your own swings, and it is never the reason something is marked Priority.')}
+      ${part('The video', 'The switches above the video turn each overlay on and off: body lines, hand path, racket tracer, racket plane, feet, angles. Use the buttons under the video to step one frame at a time or jump to contact. Pick a speed on the right.')}
+      ${part('Drawing', 'Pick Line, Angle, Circle or Draw beside the video, then drag on the picture. Line shows its angle from level. Angle: drag the first side out from the corner, then the second. Tap the tool again to stop drawing. Drawings are saved with the video.')}
+      ${part('Compare', 'Pick a baseline and a retest. Both play together, lined up on contact, and the page shows what moved the right way.')}
+      ${part('Saving', 'Everything is saved on this computer automatically and listed under Home. The Save button gives you a PDF report, the marked-up video, a picture of the current frame and the numbers as a spreadsheet. Star a video to keep it in favourites.')}`, 'Help');
+  }
+  $('#help').addEventListener('click', openHelp);
 
   // ---------- theme ----------
   const themeBtn = $('#theme');
@@ -75,8 +176,9 @@
 
   // ---------- routing ----------
   function route() {
-    clearInterval(pollTimer); closeDrawer();
+    clearTimeout(pollTimer); closeDrawer(); sendMarks();
     if (deck) { deck.destroy(); deck = null; }
+    view.onclick = view.onkeydown = drawer.onclick = null; saveCtx = null;
     const h = location.hash || '#/', parts = h.slice(2).split('/');
     const nav = parts[0] === 'new' ? parts[1] : parts[0] === 'compare' ? 'compare' : parts[0] === '' ? 'home' : '';
     $$('.topbar nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === nav));
@@ -100,6 +202,7 @@
   const KIND_NAME = {swing: 'Swing', serve: 'Serve', lesson: 'Lesson', match: 'Match'};
   const when = t => new Date(t * 1000).toLocaleString([], {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'});
 
+  let libFilter = 'all';
   async function home() {
     const mode = (kind, href, title, text, lead) => `<a class="panel mode ${lead ? 'lead' : ''}" href="${href}"><span class="ico">${modeIcon(kind)}</span><h3>${title}</h3><span class="small ink2">${text}</span></a>`;
     view.innerHTML = `
@@ -112,15 +215,33 @@
         ${mode('lesson', '#/new/lesson', 'Lesson', 'Every shot from a lesson: type, where it was hit, where it landed, in or out.')}
         ${mode('match', '#/new/match', 'Match', 'Singles or doubles: every player and shot, stats, positioning and strategy.')}
       </div>
-      <div class="homegrid" style="margin-top:14px"><section class="panel"><h2>Recent</h2><div id="recent" class="list muted">Loading…</div></section><div id="phone"></div></div>`;
+      <div class="homegrid" style="margin-top:14px"><section class="panel"><h2>Saved videos<span class="tiny muted" style="font-weight:500">Kept on this computer</span></h2>
+        <div class="tabs" id="libTabs" style="margin-bottom:6px">${[['all', 'All'], ['starred', 'Favourites'], ['swing', 'Swings'], ['serve', 'Serves'], ['lesson', 'Lessons'], ['match', 'Matches']].map(([k, n]) => `<button class="${k === libFilter ? 'on' : ''}" data-lib="${k}">${n}</button>`).join('')}</div>
+        <div id="recent" class="muted">Loading...</div></section><div id="phone"></div></div>`;
     phoneCard();
-    try {
-      const jobs = await api('/api/jobs');
-      if (!$('#recent')) return;
-      $('#recent').innerHTML = jobs.length ? jobs.map(j => `<a href="#/job/${j.id}"><span class="avatar" style="width:36px;height:36px;flex-basis:36px">${modeIcon(j.kind in MODE_ICON ? j.kind : 'swing').replace('<svg', '<svg width="18" height="18"')}</span>
-        <span class="grow"><b class="cut" style="display:block;font-weight:600">${esc(j.title)}</b><span class="tiny muted">${when(j.created)} · ${j.status === 'done' ? 'ready' : j.status === 'error' ? 'could not be analysed' : esc(j.status)}</span></span>
-        <span class="chip flat">${KIND_NAME[j.kind] || esc(j.kind)}</span></a>`).join('') : 'Nothing yet. Upload a video to start.';
-    } catch (e) { $('#recent').innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+    let jobs = [];
+    const paint = () => {
+      const box = $('#recent'); if (!box) return;
+      const rows = jobs.filter(j => libFilter === 'all' || (libFilter === 'starred' ? j.starred : j.kind === libFilter));
+      box.innerHTML = rows.length ? rows.map(j => `<div class="lrow"><button class="ibtn star ${j.starred ? 'on' : ''}" data-star="${j.id}" aria-pressed="${!!j.starred}" aria-label="${j.starred ? 'Remove from favourites' : 'Add to favourites'}" title="Favourite">${ICON.star}</button>
+          <a class="grow" href="#/job/${j.id}"><b class="cut">${esc(j.title)}</b><span class="tiny muted">${when(j.created)} · ${j.status === 'done' ? 'ready' : j.status === 'error' ? 'could not be analysed' : j.status === 'queued' ? 'waiting in line' : 'analyzing'}</span></a>
+          <span class="chip flat">${KIND_NAME[j.kind] || esc(j.kind)}</span>
+          <button class="ibtn" data-del="${j.id}" aria-label="Delete ${esc(j.title)}" title="Delete" ${j.status === 'queued' || j.status === 'running' ? 'disabled' : ''}>${ICON.clear}</button></div>`).join('')
+        : `<p class="small" style="padding:10px 0">${jobs.length ? 'Nothing here yet.' : 'Nothing yet. Pick Swing or Serve above and upload a video to start.'}</p>`;
+    };
+    view.onclick = async ev => {
+      const tab = ev.target.closest('[data-lib]'), star = ev.target.closest('[data-star]'), del = ev.target.closest('[data-del]');
+      try {
+        if (tab) { libFilter = tab.dataset.lib; $$('#libTabs button').forEach(b => b.classList.toggle('on', b === tab)); paint(); }
+        else if (star) { const j = jobs.find(x => x.id === star.dataset.star); j.starred = (await patchJob(j.id, {starred: !j.starred})).starred; paint(); TT.toast(j.starred ? 'Added to favourites' : 'Removed from favourites'); }
+        else if (del) {
+          if (!del.classList.contains('sure')) { del.classList.add('sure'); TT.toast('Tap the bin again to delete it for good'); setTimeout(() => del.classList.remove('sure'), 4000); return; }
+          await api('/api/jobs/' + del.dataset.del, {method: 'DELETE'}); jobs = jobs.filter(x => x.id !== del.dataset.del); paint(); TT.toast('Deleted');
+        }
+      } catch (e) { TT.toast(e.message); }
+    };
+    try { jobs = await api('/api/jobs'); paint(); }
+    catch (e) { if ($('#recent')) $('#recent').innerHTML = `<span class="err">${esc(e.message)}</span>`; }
   }
 
   // On the computer: how to open the app on the phone. On the phone: how to add it to the home screen.
@@ -199,8 +320,17 @@
         if (pickedCorners && pickedCorners.length === 4) fd.append('corners', JSON.stringify(pickedCorners));
       } else { fd.append('hand', $('#hand').value); if (kind === 'serve') fd.append('serve_type', $('#stype').value); }
       $('#go').disabled = true; $('#go').textContent = 'Uploading…'; $('#msg').textContent = '';
-      try { const r = await api('/api/jobs', {method: 'POST', body: fd}); location.hash = '#/job/' + r.id; }
-      catch (e) { $('#msg').textContent = e.message; $('#go').disabled = false; $('#go').textContent = 'Analyze'; }
+      try {
+        const r = await new Promise((resolve, reject) => {
+          const x = new XMLHttpRequest();
+          x.open('POST', '/api/jobs');
+          x.upload.onprogress = e => { if (e.lengthComputable) $('#go').textContent = e.loaded < e.total ? `Uploading ${Math.round(100 * e.loaded / e.total)}%` : 'Starting the analysis...'; };
+          x.onload = () => { let body = {}; try { body = JSON.parse(x.responseText); } catch (e) {} x.status < 300 ? resolve(body) : reject(new Error(body.detail || 'The upload did not go through. Try again.')); };
+          x.onerror = () => reject(new Error('Could not reach the computer running Tracer Tennis. Check it is on and on the same Wi-Fi.'));
+          x.send(fd);
+        });
+        location.hash = '#/job/' + r.id;
+      } catch (e) { $('#msg').textContent = e.message; $('#go').disabled = false; $('#go').textContent = 'Analyze'; }
     });
   }
 
@@ -261,16 +391,19 @@
     view.innerHTML = '<p class="muted">Loading…</p>';
     const tick = async () => {
       let job;
-      try { job = await api('/api/jobs/' + id); } catch (e) { view.innerHTML = `<p class="err">${esc(e.message)}</p>`; clearInterval(pollTimer); return; }
-      if (job.status === 'done') { clearInterval(pollTimer); return job.kind === 'swing' || job.kind === 'serve' ? swingReport(job, pick) : matchReport(job); }
-      if (job.status === 'error') { clearInterval(pollTimer); view.innerHTML = `<div class="narrow"><div class="titlebar"><h1>${esc(job.title)}</h1></div><section class="panel"><p class="err">${esc(job.error)}</p><p style="margin-top:10px"><a class="btn" href="#/new/${job.kind}">Try another video</a></p></section></div>`; return; }
-      const p = Math.round((job.progress || 0) * 100), body = job.kind === 'swing' || job.kind === 'serve' ? 'the body and racket frame by frame' : 'players, ball and shots';
+      try { job = await api('/api/jobs/' + id); } catch (e) { finished = true; if (location.hash.includes(id)) view.innerHTML = `<div class="narrow"><section class="panel"><p class="err">${esc(e.message)}</p><p style="margin-top:10px"><a class="btn" href="#/">Back to Home</a></p></section></div>`; return; }
+      if (!location.hash.includes(id)) { finished = true; return; }        // the user moved to another page while this was loading
+      if (job.status === 'done') { finished = true; return job.kind === 'swing' || job.kind === 'serve' ? swingReport(job, pick) : matchReport(job); }
+      if (job.status === 'error') { finished = true; view.innerHTML = `<div class="narrow"><div class="titlebar"><h1>${esc(job.title)}</h1></div><section class="panel"><p class="err">${esc(job.error)}</p><p style="margin-top:10px"><a class="btn" href="#/new/${job.kind}">Try another video</a></p></section></div>`; return; }
+      const p = Math.round((job.progress || 0) * 100), solo = job.kind === 'swing' || job.kind === 'serve';
+      const body = !solo ? 'players, ball and shots' : p < 60 ? 'the body in every frame (step 1 of 3)' : p < 80 ? 'the racket (step 2 of 3)' : 'the last details and drawing the video (step 3 of 3)';
       view.innerHTML = `<div class="narrow"><div class="titlebar"><div><span class="eyebrow">${job.status === 'queued' ? 'Waiting in line' : 'Analyzing'}</span><h1>${esc(job.title)}</h1></div></div>
         <section class="panel"><div class="rowline spread" style="margin-bottom:8px"><b>${job.status === 'queued' ? 'Waiting for the video ahead of it' : 'Tracking ' + body}</b><span class="num ink2">${p}%</span></div>
         <div class="progress"><i style="width:${p}%"></i></div><p class="small muted" style="margin-top:10px">You can leave this page and come back.</p></section></div>`;
     };
-    await tick();
-    pollTimer = setInterval(tick, 1500);
+    let finished = false;                       // keep asking only while the video is still being analysed
+    const loop = async () => { await tick(); if (!finished && location.hash.includes(id)) pollTimer = setTimeout(loop, 1500); };
+    await loop();
   }
 
   function lineChart(series, marks, opts = {}) {
@@ -348,17 +481,36 @@
       <text x="35" y="29" font-size="11" font-weight="650" fill="var(--blue)">To target</text>${chest}${feet.map(shoe).join('')}${ball}</svg>`;
   }
 
+  const SURE = {estimate: 'Estimate', low: 'Not seen clearly'};
+  const sureChip = level => SURE[level] ? `<span class="chip flat" title="${level === 'estimate' ? 'A guide, not an exact number' : 'Left ungraded'}">${SURE[level]}</span>` : '';
+  // what to ring on the video for each number
+  const SPOT_RULES = [
+    [/^(contact_|extension|speed_carried|swing_path|follow_length|finish_height|hand_speed|serve_contact_|serve_swing_up|serve_follow|serve_hand)/, ['hand']],
+    [/elbow/, ['elbow']], [/^serve_toss/, ['toss_hand']], [/^(separation|serve_coil)/, ['shoulders', 'hips']],
+    [/shoulder/, ['shoulders']], [/^(trunk_lean|chest_lead|serve_trunk)/, ['spine']], [/^head_/, ['head']],
+    [/^(weight_|balance|hip_|serve_rise|serve_into)/, ['hips']], [/^(lead_|serve_knee_lead|serve_leg_drive_lead)/, ['lead_knee']],
+    [/^(trail_|serve_knee_trail|serve_leg_drive_trail)/, ['trail_knee']], [/^(knee_bend|leg_drive)/, ['dom_knee']],
+    [/^(front_foot|step_in)/, ['front_foot']], [/^back_foot/, ['back_foot']], [/^(stance|serve_stance|serve_feet)/, ['feet']],
+    [/^(racket_|approach_angle|swing_plane|serve_racket)/, ['racket']],
+  ];
+  const spotFor = m => ({parts: (SPOT_RULES.find(([re]) => re.test(m.key)) || [0, ['hand']])[1],
+    label: `${m.label.split(' (')[0].split(':')[0]}${typeof m.value === 'number' ? ' ' + fmt(m.value) + (m.unit === 'deg' ? '°' : m.unit ? ' ' + m.unit : '') : ''}`});
+  const cueBlock = f => `<div class="focus"><div class="lbl">The focus</div><b>${esc(f.cue)}</b></div>
+    ${f.alts && f.alts.length ? `<div class="alts"><span class="tiny muted">Or say it this way</span>${f.alts.map(a => `<span class="chip">${esc(a)}</span>`).join('')}</div>` : ''}
+    ${f.check ? `<p class="check"><span class="ck">${ICON.check}</span><span><b>You got it when:</b> ${esc(f.check)}</span></p>` : ''}`;
+
   function numberDrawer(s, m, c) {
     const g = (c && c.grades[m.key]) || 'not_graded', fix = c && c.fixes.find(f => f.key === m.key), win = c && c.strengths.find(w => w.key === m.key);
     const [name, ...rest] = m.label.split(' (');
-    return `<div style="margin-top:14px">${gradeChip(g)} <span class="chip flat">${esc(m.phase)}</span></div>
+    return `<div style="margin-top:14px" class="rowline wrapline">${gradeChip(g)}<span class="chip flat">${esc(m.phase)}</span>${sureChip(m.confidence)}</div>
       <h3>${esc(name)}</h3>${rest.length ? `<p class="small muted">${esc(rest.join(' (').replace(/\)$/, ''))}</p>` : ''}
       <div class="valrow"><div class="val num">${valTxt(m.value, m.unit)}</div>${m.typical ? `<div class="target">Target<b>${esc(m.typical)}${m.unit === 'deg' ? '°' : ''}</b></div>` : ''}</div>
       ${meter(c && c.meters[m.key], m.value)}
       ${fix ? `<div class="lbl">What we saw</div><p>${esc(fix.saw)}</p><div class="lbl">Why it matters</div><p>${esc(fix.why)}</p>
-          <div class="focus"><div class="lbl">The focus</div><b>${esc(fix.cue)}</b></div><div class="lbl">Try this</div><p>${esc(fix.drill)}</p>`
+          ${cueBlock(fix)}<div class="lbl">Try this</div><p>${esc(fix.drill)}</p>`
         : `${win ? `<div class="lbl">What we saw</div><p>${esc(win.text)}</p>` : ''}${m.note ? `<div class="lbl">What it means</div><p>${esc(m.note)}</p>` : ''}`}
-      ${g === 'not_graded' ? '<p class="small muted" style="margin-top:14px">This number is shown for reference. It is not graded because the right value depends on the ball and the shot you were hitting.</p>' : ''}
+      ${m.seen ? `<div class="lbl">How sure is this</div><p class="small">${esc(m.seen)}</p>` : ''}
+      ${g === 'not_graded' && m.confidence !== 'low' ? '<p class="small muted" style="margin-top:14px">This number is shown for reference. It is not graded because the right value depends on the ball and the shot you were hitting.</p>' : ''}
       <p style="margin-top:18px"><button class="btn primary" data-show="${m.key}">Show me in slow motion</button></p>`;
   }
 
@@ -379,7 +531,7 @@
       if (deck) { deck.destroy(); deck = null; }
       const s = r.swings[current], c = s.coaching || null, byKey = Object.fromEntries(s.metrics.map(m => [m.key, m]));
       const grades = (c && c.grades) || {}, phases = s.phases || PHASES, ref = `${id}:${s.index}`;
-      const top = c && c.fixes[0], hit = c ? c.counts.on_target + c.counts.strength : 0;
+      const top = c && c.fixes[0], hit = c ? c.counts.on_target : 0, sure = (c && c.confidence) || {};
       const racket = r.series.racket_head_speed;
       const chartSeries = [{name: 'Hand, mph', color: 'var(--ink2)', t: r.series.t, y: r.series.hand_speed.map(v => v * MPH)}];
       if (racket) chartSeries.push({name: 'Racket head, mph', color: 'var(--blue)', t: r.series.t, y: racket.map(v => v === null ? null : v * MPH)});
@@ -392,13 +544,14 @@
       const audio = (s.contact_source || '').includes('audio');
 
       view.innerHTML = `
-        <div class="titlebar"><div><span class="eyebrow">${isServe ? 'Serve read' : 'Swing read'}</span><h1>${esc(swingName(s))}<span class="when">${esc(job.title)} · ${when(job.created)}</span></h1></div>
-          <div class="acts"><a class="btn" href="#/new/${job.kind}">New video</a><a class="btn primary" href="#/compare/${ref}">Compare</a></div></div>
+        <div class="titlebar"><div><span class="eyebrow">${isServe ? 'Serve read' : 'Swing read'}</span><h1>${esc(swingName(s))}<span class="when"><span data-title>${esc(job.title)}</span> · ${when(job.created)}</span></h1></div>
+          <div class="acts"><button class="btn" data-open-save>${ICON.save}Save</button><a class="btn" href="#/new/${job.kind}">New video</a><a class="btn primary" href="#/compare/${ref}">Compare</a></div></div>
         ${r.swings.length > 1 ? `<div class="tabs" style="margin-bottom:14px">${r.swings.map((x, i) => `<button class="${i === current ? 'on' : ''}" data-swing="${i}">${i + 1}. ${esc(swingName(x))}</button>`).join('')}</div>` : ''}
         <div class="cols">
           <div class="stack left">
             ${c ? `<section class="panel"><h2>${isServe ? 'Serve read' : 'Swing read'}</h2><p class="tiny muted" style="margin:-4px 0 10px">Graded against coaching target ranges for ${isServe && s.serve ? 'a ' + esc(s.serve.type) + ' serve' : 'a ' + esc(s.stroke)}.</p>
-              <div class="dialrow">${dial(hit, c.counts.graded)}${countsBlock(c.counts)}</div></section>
+              <div class="dialrow">${dial(hit, c.counts.graded)}${countsBlock(c.counts)}</div>
+              ${c.counts.estimates || c.counts.unclear ? `<p class="tiny muted" style="margin-top:10px">${c.counts.estimates ? `${c.counts.estimates} of these are estimates: good guides, but never the reason something is marked Priority. ` : ''}${c.counts.unclear ? `${c.counts.unclear} could not be seen clearly and ${c.counts.unclear === 1 ? 'is' : 'are'} left ungraded.` : ''}</p>` : ''}</section>
               <section class="panel first" id="first"></section>
               <section class="panel"><h2>${isServe ? 'Parts of the serve' : 'Parts of the swing'}</h2>${c.categories.map(cat => `<div class="part"><b style="font-weight:600">${esc(cat.name)}</b><span class="small ink2 num">${cat.keys.filter(k => ['on_target', 'strength'].includes(grades[k])).length} of ${cat.checks} on target</span>
                 <div class="pips">${cat.keys.map(k => `<i style="background:var(--g-${grades[k] || 'not_graded'})" title="${esc((byKey[k] || {}).label || k)}"></i>`).join('')}</div></div>`).join('')}</section>` : `<section class="panel"><p>This report was made with an older version. Upload the video again to get the full read.</p></section>`}
@@ -435,6 +588,7 @@
               <span class="grow"><b class="cut" style="display:block;font-weight:600">${esc(o.name)}</b><span class="tiny muted cut" style="display:block">${esc(o.title)}</span></span><span class="dot light-${o.light}"></span></a>`).join('') || '<p class="small muted">Analysed swings show up here.</p>'}</div></section>
             ${s.topdown && s.topdown.contact ? `<section class="panel"><h2>Feet from above</h2><div class="tabs fill" id="eye"><button data-eye="set">Racket back</button><button data-eye="contact">Contact</button></div>
               <div id="eyeSvg" style="margin-top:6px"></div><p class="small">${stance ? `<b>${esc(cap(String(stance.value)))} stance.</b> ${esc(stance.note)}` : ''}${step && typeof step.value === 'number' && step.value >= 8 ? ` You stepped ${Math.round(step.value / 2.540)} inches toward the target.` : ''}</p></section>` : ''}
+            ${r.checks && r.checks.length ? `<section class="panel"><h2>Video check</h2><div class="checks">${r.checks.map(k => `<div class="chk"><span>${mark({good: 'strength', warn: 'building', bad: 'priority'}[k.status])}</span><div><b>${esc(k.label)}</b><p class="small ink2">${esc(k.text)}</p>${k.tip && k.status !== 'good' ? `<p class="small"><b>Next time:</b> ${esc(k.tip)}</p>` : ''}</div></div>`).join('')}</div></section>` : ''}
             <section class="panel"><div class="rowline"><span class="avatar">${s.hand === 'left' ? 'L' : 'R'}</span><div class="grow"><b>${esc(cap(s.hand))}-handed</b><div class="tiny muted">${heightTxt(r.player.height_m)}, as entered</div></div></div>
               <div class="facts"><div class="groove"><span class="eyebrow">Camera</span><b class="num">${Math.round(r.player.camera_distance_m * 3.281)} ft away</b></div><div class="groove"><span class="eyebrow">Video</span><b class="num">${Math.round(r.video.fps)} fps</b></div>
                 <div class="groove"><span class="eyebrow">Racket seen</span><b class="num">${r.player.racket_seen_pct === null || r.player.racket_seen_pct === undefined ? 'no' : r.player.racket_seen_pct + '%'}</b></div><div class="groove"><span class="eyebrow">Body tracked</span><b class="num">${Math.round(100 * r.video.pose_frames_detected / r.video.frames)}%</b></div></div>
@@ -443,7 +597,8 @@
         </div>`;
 
       deck = TT.deck($('#deck'), {
-        stages: [{src, fps, tracks, swings: r.swings, series: r.series, zeroFrame: s.frames.contact}], startFrame: s.frames.takeback,
+        stages: [{src, fps, tracks, swings: r.swings, series: r.series, zeroFrame: s.frames.contact, marks: (job.marks || [])[0]}], startFrame: s.frames.takeback,
+        name: job.title.replace(/\.[a-z0-9]{2,4}$/i, ''), onMarks: marks => saveMarks(job, marks),
         onFrame(i) {
           const hp = $('#hudPhase'); if (!hp) return;
           let phase = phases[0][1];
@@ -453,27 +608,27 @@
           $('#hudRacket').textContent = racket && racket[i] !== null && racket[i] !== undefined ? Math.round(racket[i] * MPH) + ' mph' : '–';
         },
       });
-      const show = key => { closeDrawer(); deck.showAt(s.frames[momentOf(s, key)] ?? s.frames.contact); };
+      const show = key => { closeDrawer(); if (tracks && byKey[key]) deck.spot(spotFor(byKey[key])); deck.showAt(s.frames[momentOf(s, key)] ?? s.frames.contact); };
 
       const paintFirst = () => {
         const box = $('#first'); if (!box) return;
         if (!c.fixes.length) { box.innerHTML = `<h2>Work on first</h2><p>Nothing needs fixing on this one. Every graded number is on target.</p>`; return; }
         const f = c.fixes[fixAt], m = byKey[f.key] || f;
         box.innerHTML = `<div class="head"><h2 style="margin:0">Work on first</h2><div class="pager"><button class="ibtn" data-fix="-1" aria-label="Previous" ${fixAt === 0 ? 'disabled' : ''}>${ICON.left}</button><span class="num">${fixAt + 1} of ${c.fixes.length}</span><button class="ibtn" data-fix="1" aria-label="Next" ${fixAt === c.fixes.length - 1 ? 'disabled' : ''}>${ICON.right}</button></div></div>
-          <div class="rowline" style="flex-wrap:wrap;gap:6px"><span class="chip flat">${esc(f.category)}</span>${gradeChip(f.grade)}${f.situational ? '<span class="chip flat">Partly the ball you got</span>' : ''}</div>
+          <div class="rowline" style="flex-wrap:wrap;gap:6px"><span class="chip flat">${esc(f.category)}</span>${gradeChip(f.grade)}${f.situational ? '<span class="chip flat">Partly the ball you got</span>' : ''}${sureChip(f.confidence)}</div>
           <h3 style="margin-top:10px">${esc(f.label.split(' (')[0])}</h3>
           <div class="valrow"><div class="val num">${valTxt(f.value, f.unit)}</div>${f.typical ? `<div class="target">Target<b>${esc(f.typical)}${f.unit === 'deg' ? '°' : ''}</b></div>` : ''}</div>
           ${meter(c.meters[f.key], f.value)}
           <p style="margin-top:10px">${esc(f.saw)}</p>
-          <div class="focus"><div class="lbl">The focus</div><b>${esc(f.cue)}</b></div>
+          ${cueBlock(f)}
           <div class="two"><button class="btn" data-show="${f.key}">Show me</button><button class="btn" data-drill="${f.key}">Drill</button></div>`;
       };
       const paintRows = () => {
         $('#rows').innerHTML = ordered.filter(m => filter === 'All' || m.phase === filter).map(m => {
           const [name, ...rest] = m.label.split(' (');
           return `<tr class="rowbtn" data-key="${m.key}" tabindex="0"><td class="phc"><span class="ph num">${phaseNames.indexOf(m.phase) + 1}</span></td>
-            <td class="name"><b>${esc(name)}</b><span>${esc(m.phase)}${rest.length ? ' · ' + esc(rest.join(' (').replace(/\)$/, '')) : ''}</span></td>
-            <td>${gradeChip(grades[m.key] || 'not_graded')}</td><td class="v num">${valTxt(m.value, m.unit)}</td><td class="t">${esc(m.typical || '')}</td><td class="m">${meter(c && c.meters[m.key], m.value)}</td></tr>`;
+            <td class="name"><b>${esc(name)}</b><span>${m.confidence === 'low' ? esc((m.seen || '').replace(/^Not graded: /, 'Not seen clearly: ')) : esc(m.phase) + (rest.length ? ' · ' + esc(rest.join(' (').replace(/\)$/, '')) : '')}</span></td>
+            <td>${gradeChip(grades[m.key] || 'not_graded')}</td><td class="v num ${m.confidence === 'low' ? 'dim' : ''}">${valTxt(m.value, m.unit)}${m.confidence === 'estimate' ? '<span class="est" title="An estimate: a guide, not an exact number">est.</span>' : ''}</td><td class="t">${esc(m.typical || '')}</td><td class="m">${meter(c && c.meters[m.key], m.value)}</td></tr>`;
         }).join('');
       };
       const paintEye = () => { if (!$('#eyeSvg')) return; $('#eyeSvg').innerHTML = birdsEye(s.topdown, eye, grades, byKey); $$('#eye button').forEach(b => b.classList.toggle('on', b.dataset.eye === eye)); };
@@ -481,15 +636,16 @@
       paintRows(); paintEye();
 
       view.onclick = ev => {
-        const el = ev.target.closest('[data-swing],[data-fix],[data-show],[data-drill],[data-freeze],[data-filter],[data-eye],[data-key]');
+        const el = ev.target.closest('[data-swing],[data-fix],[data-show],[data-drill],[data-freeze],[data-filter],[data-eye],[data-key],[data-open-save]');
         if (!el) return;
         if (el.dataset.swing) { current = +el.dataset.swing; fixAt = 0; filter = 'All'; draw(); }
         else if (el.dataset.fix) { fixAt = Math.max(0, Math.min(c.fixes.length - 1, fixAt + +el.dataset.fix)); paintFirst(); }
         else if (el.dataset.show) show(el.dataset.show);
         else if (el.dataset.drill) { const f = c.fixes.find(x => x.key === el.dataset.drill); openDrawer(`<div style="margin-top:14px">${gradeChip(f.grade)} <span class="chip flat">${esc(f.category)}</span></div><h3>${esc(f.title)}</h3>
-          <div class="lbl">Why it matters</div><p>${esc(f.why)}</p><div class="focus"><div class="lbl">The focus</div><b>${esc(f.cue)}</b></div><div class="lbl">Try this</div><p>${esc(f.drill)}</p>
-          <p style="margin-top:18px"><button class="btn primary" data-show="${f.key}">Show me in slow motion</button></p>`); }
-        else if (el.dataset.freeze) { deck.freeze(+el.dataset.freeze); if (el.tagName === 'FIGURE') deck.el.scrollIntoView({behavior: 'smooth', block: 'nearest'}); }
+          <div class="lbl">What we saw</div><p>${esc(f.saw)}</p><div class="lbl">Why it matters</div><p>${esc(f.why)}</p>${cueBlock(f)}${f.cue_more ? `<div class="lbl">In more words</div><p>${esc(f.cue_more)}</p>` : ''}<div class="lbl">The drill</div><p>${esc(f.drill)}</p>
+          <p style="margin-top:18px"><button class="btn primary" data-show="${f.key}">Show me in slow motion</button></p>`, 'Drill'); }
+        else if (el.dataset.openSave !== undefined) openSave(job, {swing: s.index, onTitle: t => { job.title = t; $$('[data-title]').forEach(x => { x.textContent = t; }); }});
+        else if (el.dataset.freeze) { deck.spot(null); deck.freeze(+el.dataset.freeze); if (el.tagName === 'FIGURE') deck.el.scrollIntoView({behavior: 'smooth', block: 'nearest'}); }
         else if (el.dataset.filter) { filter = el.dataset.filter; $$('#filter button').forEach(b => b.classList.toggle('on', b === el)); paintRows(); }
         else if (el.dataset.eye) { eye = el.dataset.eye; paintEye(); }
         else if (el.dataset.key) openDrawer(numberDrawer(s, byKey[el.dataset.key], c));
@@ -555,12 +711,12 @@
     const stageOf = n => { const x = sides[n], t = tracks[n], rep = jobs[n].report;
       return {src: `/files/${x.job}/${t ? x.files.clean : 'overlay.mp4'}`, fps: t ? t.fps : x.fps, tracks: t, swings: [x.swing], series: rep.series, zeroFrame: x.contact_frame, tag: names[n]}; };
     const speed = n => { const rep = jobs[n].report, t0 = sides[n].swing.times.contact; return {name: names[n] + ', hand mph', color: n ? 'var(--blue)' : 'var(--ink2)', dash: !n, t: rep.series.t.map(t => t - t0), y: rep.series.hand_speed.map(v => v * MPH)}; };
-    const cnt = k => k ? `<span class="rowline small" style="gap:10px;flex-wrap:wrap">${['priority', 'building', 'on_target', 'strength'].map(g => `<span class="rowline" style="gap:5px">${mark(g)}<b class="num">${k[g]}</b></span>`).join('')}</span>` : '';
+    const cnt = k => k ? `<span class="rowline small" style="gap:10px;flex-wrap:wrap">${['priority', 'building', 'on_target', 'strength'].map(g => `<span class="rowline" style="gap:5px" title="${GRADES[g]}">${mark(g)}<b class="num">${g === 'on_target' ? k.on_target - (k.strength || 0) : k[g]}</b></span>`).join('')}</span>` : '';
     const phases = c.b.swing.phases || PHASES;
     const worked = c.worked_on || [];
     view.innerHTML = `
       <div class="titlebar"><div><span class="eyebrow">Compare</span><h1>${esc(c.b.name)} against ${esc(c.a.name.toLowerCase())}<span class="when">${esc(c.b.title)} against ${esc(c.a.title)}</span></h1></div>
-        <div class="acts"><a class="btn" href="#/compare/${encodeURIComponent(refB)}/${encodeURIComponent(refA)}">Swap</a><a class="btn" href="#/compare">Pick other swings</a><a class="btn primary" href="#/new/${c.b.kind}">Retest again</a></div></div>
+        <div class="acts"><a class="btn" href="#/compare/${encodeURIComponent(refB)}/${encodeURIComponent(refA)}">Swap</a><a class="btn" href="#/compare">Pick other swings</a><button class="btn" data-pic>${ICON.save}Save picture</button><a class="btn primary" href="#/new/${c.b.kind}">Retest again</a></div></div>
       <div class="cols">
         <div class="stack left">
           <section class="panel"><h2>Result</h2>
@@ -590,8 +746,12 @@
             <div class="grow"><b class="cut" style="display:block">${esc(x.name)}</b><span class="tiny muted cut" style="display:block">${esc(x.title)}</span><span class="tiny muted">${when(x.created)}</span></div></div>
           ${c.overall.a !== null ? `<div class="sep"></div>${cnt(c.counts[n ? 'b' : 'a'])}` : ''}</section>`).join('')}</div>
       </div>`;
-    deck = TT.deck($('#deck'), {stages: [stageOf(1), stageOf(0)].reverse()});
-    view.onclick = ev => { const el = ev.target.closest('[data-rel]'); if (el) deck.freeze(deck.master.zeroFrame + Math.round(+el.dataset.rel * deck.master.fps)); };
+    deck = TT.deck($('#deck'), {stages: [stageOf(0), stageOf(1)], name: 'compare'});
+    view.onclick = ev => {
+      const el = ev.target.closest('[data-rel]');
+      if (el) deck.freeze(deck.master.zeroFrame + Math.round(+el.dataset.rel * deck.master.fps));
+      if (ev.target.closest('[data-pic]')) deck.savePicture();
+    };
   }
 
   // ---------- match and lesson ----------
@@ -655,8 +815,8 @@
     const teamName = t => r.players.filter(p => p.team === t).map(p => esc(p.name)).join(' / ');
     const posAll = r.positioning_all_rallies;
     view.innerHTML = `
-      <div class="titlebar"><div><span class="eyebrow">${r.lesson ? 'Lesson' : 'Match'}</span><h1>${esc(job.title)}<span class="when">${when(job.created)}</span></h1></div>
-        <div class="acts"><span class="chip flat">${esc(cap(r.format))}</span><span class="chip flat">${calibrated ? 'Court marked' : 'Court not marked'}</span><span class="chip flat">Ball seen ${r.tracking.ball_seen_pct}% of frames</span></div></div>
+      <div class="titlebar"><div><span class="eyebrow">${r.lesson ? 'Lesson' : 'Match'}</span><h1><span data-title>${esc(job.title)}</span><span class="when">${when(job.created)}</span></h1></div>
+        <div class="acts"><button class="btn" data-open-save>${ICON.save}Save</button><span class="chip flat">${esc(cap(r.format))}</span><span class="chip flat">${calibrated ? 'Court marked' : 'Court not marked'}</span><span class="chip flat">Ball seen ${r.tracking.ball_seen_pct}% of frames</span></div></div>
       <div class="cols">
         <div class="stack left">
           ${r.warnings.map(w => `<section class="panel small">${esc(w)}</section>`).join('')}
@@ -705,10 +865,12 @@
             <div id="court" style="margin-top:10px"></div><p class="tiny muted" style="margin-top:6px">Faded landing marks were out or in the net.</p></section>` : ''}
         </div>
       </div>`;
-    deck = TT.deck($('#deck'), {stages: [{src: `/files/${id}/overlay.mp4`, fps: r.tracking.analysis_fps}], contact: false});
+    deck = TT.deck($('#deck'), {stages: [{src: `/files/${id}/overlay.mp4`, fps: r.tracking.analysis_fps, marks: (job.marks || [])[0]}], contact: false,
+      name: job.title.replace(/\.[a-z0-9]{2,4}$/i, ''), onMarks: marks => saveMarks(job, marks)});
     const paint = () => { if ($('#court')) $('#court').innerHTML = courtSvg(r, layer); };
     view.onclick = ev => {
       const seek = ev.target.closest('[data-seek]'), l = ev.target.closest('[data-l]');
+      if (ev.target.closest('[data-open-save]')) openSave(job, {onTitle: t => { job.title = t; $$('[data-title]').forEach(x => { x.textContent = t; }); }});
       if (seek) { deck.freeze(Math.round(+seek.dataset.seek * deck.master.fps)); setTimeout(() => { if (!deck.playing) deck.toggle(); }, 150); deck.el.scrollIntoView({behavior: 'smooth', block: 'nearest'}); }
       if (l) { layer = l.dataset.l; $$('#layers button').forEach(b => b.classList.toggle('on', b === l)); paint(); }
     };

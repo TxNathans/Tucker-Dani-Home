@@ -66,6 +66,23 @@ Beside the video are drawing tools: line (shows its angle from level), angle (sh
 in yellow, white or red, with undo, clear and save picture. Playback has frame stepping, a jump to contact, time
 in milliseconds from contact and speeds down to 1/10. Space plays and pauses; the arrow keys step a frame.
 
+**Saving.** Every video and its read are kept on the computer automatically (in `data/jobs`) and listed under
+Home, where they can be starred, filtered and deleted. The Save button on a read gives a PDF report (the read, the
+cue, the drill, key moments, every number, your notes), the marked-up video, a picture of the current frame, and
+the numbers as a spreadsheet file. A video can be renamed and given notes there. Drawings made on a video are
+saved with it. On an iPhone the picture goes to the share sheet, so it can be saved to Photos or sent.
+
+**Cues.** Each thing to work on has one short cue for the court, two other ways to say it, a self-check ("You got
+it when..."), and a drill. "Show me" plays that moment in slow motion and rings the body part on the video with
+its number. The question mark in the top bar opens a short guide to the whole app.
+
+**How sure each number is.** One phone camera sees some things directly and has to estimate others. Every number
+is marked as seen directly, an estimate (worked out in 3D, read from the racket's outline, or timed between
+frames), or not seen clearly (a hidden foot, a blurred racket). Estimates are graded but can never be the reason
+something is marked Priority, and numbers that were not seen clearly are left ungraded with the reason shown. A
+Video check card says what the clip allowed and what to change next time (frame rate, body and feet in view,
+racket, contact sound, camera angle).
+
 **Look.** Light frosted glass by default, with a dark version on the moon button in the top bar. The type is
 DM Sans (SIL Open Font License, bundled in `app/static/fonts`).
 
@@ -159,6 +176,10 @@ No AGPL or research-only components are used, so the stack can be shipped commer
   type yourself when you know what you were hitting.
 - Racket angles, the tracer and the plane come from the racket's bounding box. They are good for comparing your
   own swings from the same camera spot, not as absolute numbers.
+- Repeatability was checked by running one swing at five video qualities (4K 60 fps, 1080p, a brighter cropped
+  copy, 30 fps, and 720p at 30 fps). Grades held across resolution and lighting. At 30 fps the racket numbers near
+  contact moved the most, which is why they are left ungraded at that frame rate. This shows the numbers are
+  steady, not that they match a lab system: there has been no comparison against marker-based motion capture.
 - Tested on one forehand clip, one public serve clip, one 13-second handheld doubles clip, and one 7-second
   full-court rally. Real matches will surface cases these did not.
 - CPU speed is about 10 frames per second for match tracking. A one-hour match wants a GPU.

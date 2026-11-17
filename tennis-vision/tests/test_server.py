@@ -108,3 +108,45 @@ def test_swings_can_be_listed_and_compared(client, tmp_path):
     assert client.get("/api/compare", params=dict(a=rows[2]["ref"], b=rows[0]["ref"])).status_code == 400      # swing against serve
     assert client.get("/api/compare", params=dict(a=rows[2]["ref"], b="0" * 11 + "2:9")).status_code == 404
     assert client.get("/api/compare", params=dict(a="nope:1", b=rows[1]["ref"])).status_code == 404
+
+
+def test_a_video_can_be_renamed_starred_and_given_notes(client, tmp_path):
+    finished_swing_job(tmp_path, "0" * 11 + "1")
+    job_id = "0" * 11 + "1"
+    r = client.patch(f"/api/jobs/{job_id}", json=dict(title="  Dani forehand, Tuesday  ", starred=True, notes="Work on the finish."))
+    assert r.status_code == 200 and r.json()["title"] == "Dani forehand, Tuesday" and r.json()["starred"] is True
+    got = client.get(f"/api/jobs/{job_id}").json()
+    assert got["notes"] == "Work on the finish." and got["starred"] is True and got["marks"] == []
+    assert client.get("/api/jobs").json()[0]["starred"] is True
+    assert server.json.loads((tmp_path / job_id / "job.json").read_text())["notes"] == "Work on the finish."      # kept on disk
+    assert client.patch(f"/api/jobs/{job_id}", json=dict(title="   ")).status_code == 400
+    assert client.patch("/api/jobs/" + "f" * 12, json=dict(starred=True)).status_code == 404
+
+
+def test_drawings_are_saved_with_the_video(client, tmp_path):
+    finished_swing_job(tmp_path, "0" * 11 + "1")
+    job_id = "0" * 11 + "1"
+    marks = [[dict(tool="line", color="#ffd60a", pts=[[0.1, 0.2], [0.5, 0.61234567]]), dict(tool="angle", color="#ffffff", pts=[[0.2, 0.2], [0.3, 0.3], [0.4, 0.2]])]]
+    assert client.put(f"/api/jobs/{job_id}/marks", json=marks).json() == dict(saved=2)
+    back = client.get(f"/api/jobs/{job_id}").json()["marks"]
+    assert back[0][0] == dict(tool="line", color="#ffd60a", pts=[[0.1, 0.2], [0.5, 0.6123]]) and back[0][1]["tool"] == "angle"
+    for bad in ([[dict(tool="stamp", color="#ffffff", pts=[[0, 0], [1, 1]])]], [[dict(tool="line", color="red", pts=[[0, 0], [1, 1]])]],
+                [[dict(tool="line", color="#ffffff", pts=[[0, 0]])]], [[], [], []]):
+        assert client.put(f"/api/jobs/{job_id}/marks", json=bad).status_code == 400
+
+
+def test_report_pdf_and_numbers_download(client, tmp_path):
+    finished_swing_job(tmp_path, "0" * 11 + "1")
+    job_id = "0" * 11 + "1"
+    report = server.json.loads((tmp_path / job_id / "report.json").read_text())
+    report["swings"][0].update(phases=[["takeback", "Ready"], ["contact", "Contact"]], two_handed=False)
+    (tmp_path / job_id / "report.json").write_text(server.json.dumps(report))
+    client.patch(f"/api/jobs/{job_id}", json=dict(title="Dani: forehand/1.MOV", notes="Keep the head still."))
+    r = client.get(f"/api/jobs/{job_id}/report.pdf")
+    assert r.status_code == 200 and r.content[:5] == b"%PDF-" and len(r.content) > 1500
+    assert r.headers["content-disposition"] == 'attachment; filename="Dani forehand1 report.pdf"'
+    r = client.get(f"/api/jobs/{job_id}/numbers.csv")
+    lines = r.text.strip().splitlines()
+    assert lines[0].startswith("Part of the swing,Number,Value") and "Contact in front of the body,2,cm,20-45,Priority,seen directly" in lines[1]
+    assert client.get(f"/api/jobs/{job_id}/report.pdf", params=dict(swing=7)).status_code == 404
+    assert client.get(f"/api/jobs/{job_id}/shots.csv").status_code == 404

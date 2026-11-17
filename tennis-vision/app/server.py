@@ -15,7 +15,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Body, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
@@ -23,6 +23,9 @@ ROOT = Path(__file__).resolve().parent
 DATA = ROOT.parent / "data" / "jobs"
 DATA.mkdir(parents=True, exist_ok=True)
 ID_RE = re.compile(r"^[0-9a-f]{12}$")
+SAFE_NAME = re.compile(r"[^A-Za-z0-9 _.-]+")
+TOOLS = {"line", "angle", "circle", "pen"}
+LIST_KEYS = ("id", "kind", "status", "progress", "created", "title", "error", "starred")
 FILE_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 app = FastAPI(title="Tracer Tennis")
@@ -125,7 +128,7 @@ async def create_job(video: UploadFile = File(...), kind: str = Form("swing"), h
 
 @app.get("/api/jobs")
 def list_jobs():
-    rows = [{k: j.get(k) for k in ("id", "kind", "status", "progress", "created", "title", "error")} for j in jobs.values()]
+    rows = [{k: j.get(k) for k in LIST_KEYS} for j in jobs.values()]
     return sorted(rows, key=lambda r: -r["created"])
 
 
@@ -135,11 +138,104 @@ def get_job(job_id: str):
     job = jobs.get(job_id)
     if job is None:
         raise HTTPException(404, "Unknown job")
-    out = {k: job.get(k) for k in ("id", "kind", "status", "progress", "created", "title", "error")}
+    out = {k: job.get(k) for k in LIST_KEYS}
+    out["notes"] = job.get("notes", "")
     report = folder / "report.json"
     if job["status"] == "done" and report.exists():
         out["report"] = json.loads(report.read_text())
+    marks = folder / "marks.json"
+    out["marks"] = json.loads(marks.read_text()) if marks.exists() else []
     return JSONResponse(out)
+
+
+@app.patch("/api/jobs/{job_id}")
+def update_job(job_id: str, changes: dict = Body(...)):
+    """Rename a video, star it, or save notes with it."""
+    job_dir(job_id)
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, "Unknown job")
+    if "title" in changes:
+        title = str(changes["title"]).strip()[:80]
+        if not title:
+            raise HTTPException(400, "The name cannot be empty")
+        job["title"] = title
+    if "starred" in changes:
+        job["starred"] = bool(changes["starred"])
+    if "notes" in changes:
+        job["notes"] = str(changes["notes"])[:4000]
+    save_meta(job_id)
+    return {k: job.get(k) for k in LIST_KEYS} | dict(notes=job.get("notes", ""))
+
+
+@app.put("/api/jobs/{job_id}/marks")
+def save_marks(job_id: str, marks: list = Body(...)):
+    """Save the drawings made on a video: one list per video on screen, each a list of {tool, color, pts}."""
+    folder = job_dir(job_id)
+    if job_id not in jobs:
+        raise HTTPException(404, "Unknown job")
+    clean = []
+    try:
+        assert len(marks) <= 2
+        for stage in marks:
+            assert len(stage) <= 200
+            rows = []
+            for m in stage:
+                pts = [[round(float(x), 4), round(float(y), 4)] for x, y in m["pts"]]
+                assert m["tool"] in TOOLS and re.fullmatch(r"#[0-9a-fA-F]{6}", m["color"]) and 2 <= len(pts) <= 2000
+                rows.append(dict(tool=m["tool"], color=m["color"], pts=pts))
+            clean.append(rows)
+    except (AssertionError, KeyError, TypeError, ValueError):
+        raise HTTPException(400, "Drawings were not in the expected form")
+    (folder / "marks.json").write_text(json.dumps(clean, separators=(",", ":")))
+    return dict(saved=sum(len(s) for s in clean))
+
+
+def download_name(job: dict, suffix: str) -> str:
+    title = re.sub(r"\.[A-Za-z0-9]{2,4}$", "", job.get("title") or "video")
+    base = SAFE_NAME.sub("", title).strip() or "tracer-tennis"
+    return f"{base[:60]} {suffix}"
+
+
+@app.get("/api/jobs/{job_id}/report.pdf")
+def report_pdf(job_id: str, swing: int = 1):
+    """The read for one swing or serve as a PDF."""
+    from .report_pdf import build_pdf
+    job, report, picked = pick_swing(f"{job_id}:{swing}")
+    data = build_pdf(job, report, picked, DATA / job_id, job.get("notes", ""))
+    name = download_name(job, "report.pdf")
+    return Response(data, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@app.get("/api/jobs/{job_id}/numbers.csv")
+def numbers_csv(job_id: str, swing: int = 1):
+    """Every number for one swing or serve as a spreadsheet file."""
+    from .report_pdf import numbers_csv as build
+    job, _, picked = pick_swing(f"{job_id}:{swing}")
+    name = download_name(job, "numbers.csv")
+    return Response(build(picked), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@app.get("/api/jobs/{job_id}/shots.csv")
+def shots_csv(job_id: str):
+    """Every shot of a lesson or match as a spreadsheet file."""
+    import csv
+    import io
+    folder = job_dir(job_id)
+    job = jobs.get(job_id)
+    path = folder / "report.json"
+    if job is None or job["status"] != "done" or job["kind"] not in ("match", "lesson") or not path.exists():
+        raise HTTPException(404, "No analysed lesson or match with that id")
+    report = json.loads(path.read_text())
+    out = io.StringIO()
+    w = csv.writer(out)
+    w.writerow(["Rally", "Time (s)", "Player", "Stroke", "Contact", "Result", "Speed (mph)", "Landing depth"])
+    for rally in report.get("rallies", []):
+        for s in rally["shots"]:
+            mph = round(s["speed_kmh"] * 0.621) if s.get("speed_kmh") else ""
+            w.writerow([rally["n"], s["t"], s["name"], s["stroke"], s["contact"], s["result"], mph, s.get("depth", "")])
+    name = download_name(job, "shots.csv")
+    return Response(out.getvalue(), media_type="text/csv", headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @app.delete("/api/jobs/{job_id}")
@@ -218,13 +314,15 @@ def compare(a: str, b: str):
 
 
 @app.get("/files/{job_id}/{name}")
-def get_file(job_id: str, name: str):
+def get_file(job_id: str, name: str, download: int = 0):
     folder = job_dir(job_id)
     if not FILE_RE.match(name) or name.startswith("source") or name == "job.json":
         raise HTTPException(404, "Not found")
     path = folder / name
     if not path.is_file():
         raise HTTPException(404, "Not found")
+    if download and job_id in jobs:
+        return FileResponse(path, filename=download_name(jobs[job_id], "marked up" + path.suffix))
     return FileResponse(path)
 
 

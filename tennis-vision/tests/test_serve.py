@@ -45,7 +45,7 @@ def test_serve_coaching_uses_the_serve_book():
     c = coach(rows, "serve", SERVE_BOOK)
     assert [cat["name"] for cat in c["categories"]] == ["Stance and toss", "Trophy position", "Contact"]
     assert c["fixes"][0]["problem"] == "Your legs stay straight on the serve." and c["fixes"][0]["grade"] == "priority"
-    assert "Toss, sit, then explode up." == c["fixes"][0]["cue"]
-    assert c["counts"] == dict(priority=1, building=0, on_target=2, strength=0, graded=3) and c["light"] == "red"
+    assert "Toss, sit, explode." == c["fixes"][0]["cue"] and c["fixes"][0]["check"] == "Your heels are off the ground before you hit."
+    assert c["counts"] == dict(priority=1, building=0, on_target=2, strength=0, graded=3, estimates=0, unclear=0) and c["light"] == "red"
     assert c["meters"]["serve_knee_lead"] == dict(min=80, max=180, lo=100, hi=135)
     assert not c["stretched"]

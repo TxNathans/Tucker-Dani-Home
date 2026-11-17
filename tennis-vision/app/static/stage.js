@@ -47,7 +47,8 @@
   class Stage {
     constructor(spec) {
       Object.assign(this, {fps: 30, tracks: null, swings: [], series: null, tag: '', zeroFrame: 0}, spec);
-      this.drawings = []; this.pending = null; this.exact = null; this.head = null;
+      this.drawings = (spec.marks || []).map(m => ({tool: m.tool, color: m.color, pts: m.pts.map(p => [p[0], p[1]])}));
+      this.pending = null; this.exact = null; this.head = null; this.spot = null;
       if (this.tracks && this.tracks.racket_head) {          // light smoothing so the tracer is a clean line, not detector jitter
         const H = this.tracks.racket_head, n = Math.max(1, Math.round(this.fps * 0.035));
         this.head = H.map((p, k) => {
@@ -63,7 +64,7 @@
       this.video = this.el.firstChild; this.canvas = this.el.children[1];
       const shape = () => {
         const a = this.video.videoWidth / this.video.videoHeight || (this.tracks && this.tracks.aspect) || 0.75;
-        this.aspect = a; this.el.style.aspectRatio = String(a); this.el.style.maxWidth = `calc(${this.tall || 64}vh * ${a})`;
+        this.aspect = a; this.el.style.aspectRatio = String(a); this.el.style.maxWidth = `calc(${matchMedia('(max-width: 620px)').matches ? 58 : 64}vh * ${a})`;
       };
       this.el.style.margin = '0 auto'; this.el.style.width = '100%';
       this.video.style.height = '100%';
@@ -279,11 +280,44 @@
       }
     }
 
+    if (st.spot) drawSpot(ctx, w, h, st, P, wrist, head(i), s, pill, u);
+
     if (on.labels && s && i <= s.frames.finish + 6) {
       let label = '';
       for (const [key, name] of (s.phases || [])) if (s.frames[key] !== undefined && i >= s.frames[key]) label = name;
       if (label) pill((st.swings.length > 1 ? s.index + '. ' : '') + label, 10, 10 + h / 50, i === s.frames.contact ? BLUE : 'rgba(12, 18, 24, .78)');
     }
+  }
+
+  // ---------- spotlight: ring the body part a fix is about, with its number ----------
+  function drawSpot(ctx, w, h, st, P, wrist, racketHead, s, pill, u) {
+    const T = st.tracks, i = st.frame, dom = T.hand === 'left' ? 'left' : 'right', other = dom === 'left' ? 'right' : 'left';
+    const lead = (s && ((s.topdown && s.topdown.front) || (s.serve && s.serve.lead))) || other, trail = lead === 'left' ? 'right' : 'left';
+    const J = {left: {sh: 11, el: 13, wr: 15, hip: 23, knee: 25, ankle: 27, heel: 29, toe: 31}, right: {sh: 12, el: 14, wr: 16, hip: 24, knee: 26, ankle: 28, heel: 30, toe: 32}};
+    const mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const parts = {
+      hand: () => [wrist(i)], elbow: () => [P(J[dom].el)], toss_hand: () => [P(J[other].wr)], dom_knee: () => [P(J[dom].knee)],
+      lead_knee: () => [P(J[lead].knee)], trail_knee: () => [P(J[trail].knee)], knees: () => [P(25), P(26)],
+      front_foot: () => [mid(P(J[lead].heel), P(J[lead].toe))], back_foot: () => [mid(P(J[trail].heel), P(J[trail].toe))],
+      feet: () => [mid(P(29), P(31)), mid(P(30), P(32))], head: () => [mid(P(7), P(8))],
+      shoulders: () => [P(11), P(12)], hips: () => [P(23), P(24)], spine: () => [mid(P(11), P(12)), mid(P(23), P(24))],
+      racket: () => [racketHead || wrist(i)],
+    };
+    const pts = (st.spot.parts || ['hand']).flatMap(name => (parts[name] || parts.hand)());
+    const line = st.spot.parts.some(name => ['shoulders', 'hips', 'spine'].includes(name));
+    ctx.save();
+    ctx.lineCap = 'round';
+    if (line && pts.length >= 2) for (let k = 0; k + 1 < pts.length; k += 2) {
+      ctx.strokeStyle = 'rgba(12, 18, 24, .7)'; ctx.lineWidth = u * 5.5; ctx.beginPath(); ctx.moveTo(pts[k][0], pts[k][1]); ctx.lineTo(pts[k + 1][0], pts[k + 1][1]); ctx.stroke();
+      ctx.strokeStyle = '#ffd60a'; ctx.lineWidth = u * 3.2; ctx.beginPath(); ctx.moveTo(pts[k][0], pts[k][1]); ctx.lineTo(pts[k + 1][0], pts[k + 1][1]); ctx.stroke();
+    }
+    for (const p of pts) {
+      ctx.strokeStyle = 'rgba(12, 18, 24, .7)'; ctx.lineWidth = u * 4.4; ctx.beginPath(); ctx.arc(p[0], p[1], u * 12, 0, 7); ctx.stroke();
+      ctx.strokeStyle = '#ffd60a'; ctx.lineWidth = u * 2.4; ctx.beginPath(); ctx.arc(p[0], p[1], u * 12, 0, 7); ctx.stroke();
+    }
+    ctx.restore();
+    const top = pts.reduce((a, b) => (b[1] < a[1] ? b : a), pts[0]);
+    pill(st.spot.label, top[0], top[1] - u * 12 - h * 0.035, '#ffd60a', '#1d2536', 'center');
   }
 
   // ---------- drawings ----------
@@ -335,6 +369,7 @@
     const layers = Object.assign(Object.fromEntries(LAYERS.map(([k, , d]) => [k, d])), store.get('tt-layers', {}));
     let allOn = store.get('tt-layers-on', true), tool = null, color = COLORS[0][0], playing = false, raf = 0, alive = true, rateKey = opts.contact === false ? 'tt-rate-full' : 'tt-rate', rate = store.get(rateKey, opts.contact === false ? 1 : 0.25);
     const hasRacket = stages.some(s => s.tracks && s.tracks.racket_head);
+    let scrubbing = false;
 
     mount.innerHTML = `<div class="deck">
       ${hasLayers ? `<div class="layerbar" role="group" aria-label="What to show on the video">
@@ -343,11 +378,11 @@
       </div>` : ''}
       <div class="stagewrap"><div class="screens"></div>
         <div class="toolcol" role="toolbar" aria-label="Drawing tools">
-          ${TOOLS.map(([k, name]) => `<button class="ibtn" data-tool="${k}" title="${name}" aria-label="${name}" aria-pressed="false">${ICON[k]}</button>`).join('')}
-          <hr>${COLORS.map(([c, name], n) => `<button class="swatch ${n ? '' : 'on'}" data-color="${c}" style="background:${c}" title="${name}" aria-label="${name}"></button>`).join('')}
-          <hr><button class="ibtn" data-act="undo" title="Undo" aria-label="Undo">${ICON.undo}</button>
-          <button class="ibtn" data-act="clear" title="Clear drawings" aria-label="Clear drawings">${ICON.clear}</button>
-          <button class="ibtn" data-act="save" title="Save picture" aria-label="Save picture">${ICON.save}</button>
+          ${TOOLS.map(([k, name]) => `<button class="tool" data-tool="${k}" title="${HINTS[k]}" aria-pressed="false"><i class="ibtn">${ICON[k]}</i><span>${name === 'Freehand' ? 'Draw' : name}</span></button>`).join('')}
+          <hr><div class="swatches">${COLORS.map(([c, name], n) => `<button class="swatch ${n ? '' : 'on'}" data-color="${c}" style="background:${c}" title="${name}" aria-label="Draw in ${name.toLowerCase()}"></button>`).join('')}</div>
+          <hr><button class="tool" data-act="undo" title="Remove the last drawing"><i class="ibtn">${ICON.undo}</i><span>Undo</span></button>
+          <button class="tool" data-act="clear" title="Remove every drawing"><i class="ibtn">${ICON.clear}</i><span>Clear</span></button>
+          <button class="tool" data-act="save" title="Save a picture of this frame with everything on it"><i class="ibtn">${ICON.save}</i><span>Picture</span></button>
         </div></div>
       <div class="transport">
         <button class="ibtn" data-act="back" title="Back one frame" aria-label="Back one frame">${ICON.back}</button>
@@ -373,7 +408,7 @@
     const paint = () => {
       stages.forEach(s => s.paint(active()));
       const [lo, hi] = range(), r = rel();
-      if (document.activeElement !== scrub || playing) scrub.value = String(Math.round((r - lo) / (hi - lo) * 1000));
+      if (!scrubbing) scrub.value = String(Math.round((r - lo) / (hi - lo) * 1000));
       const fromContact = (master.frame - master.zeroFrame) / master.fps;
       clock.textContent = opts.contact !== false ? `${fromContact > 0 ? '+' : ''}${Math.round(fromContact * 1000)}` : master.video.currentTime.toFixed(2);
       if (opts.onFrame) opts.onFrame(master.frame, master);
@@ -405,7 +440,10 @@
       s.video.addEventListener('loadedmetadata', () => { if (s === master && opts.startFrame !== undefined) s.seek(s.timeOf(opts.startFrame)); else s.seek(Math.max(0, s.zero + range()[0])); });
       new ResizeObserver(() => { if (!playing) paint(); }).observe(s.el);
     });
-    scrub.addEventListener('input', () => { setPlaying(false); const [lo, hi] = range(); seekRel(lo + (hi - lo) * scrub.value / 1000); });
+    // "scrubbing" is tracked by touch, not by focus: a range input is never focused on an iPhone
+    scrub.addEventListener('pointerdown', () => { scrubbing = true; });
+    ['pointerup', 'pointercancel', 'change', 'blur'].forEach(ev => scrub.addEventListener(ev, () => { scrubbing = false; }));
+    scrub.addEventListener('input', () => { const share = scrub.value / 1000; setPlaying(false); const [lo, hi] = range(); scrub.value = String(Math.round(share * 1000)); seekRel(lo + (hi - lo) * share); });
     root.querySelector('select').addEventListener('change', ev => { rate = +ev.target.value; store.set(rateKey, rate); stages.forEach(s => { s.video.playbackRate = rate; }); });
 
     // drawing
@@ -413,7 +451,7 @@
       tool = tool === name ? null : name;
       stages.forEach(s => { s.pending = null; s.el.classList.toggle('drawing', !!tool); });
       root.querySelectorAll('[data-tool]').forEach(b => { const on = b.dataset.tool === tool; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
-      hint.textContent = tool ? HINTS[tool] : '';
+      hint.textContent = tool ? HINTS[tool] + ' Tap the tool again when you are done.' : REST;
       if (tool) setPlaying(false); else paint();
     };
     stages.forEach(s => {
@@ -442,12 +480,18 @@
           if (!far(m.pts[0], m.pts[1])) s.pending = null; else hint.textContent = 'Now drag or tap where the second side should end.';
           return paint();
         }
-        if (m.tool === 'pen' ? m.pts.length > 2 : far(m.pts[0], m.pts[1])) s.drawings.push(m);
+        if (m.tool === 'pen' ? m.pts.length > 2 : far(m.pts[0], m.pts[1])) { s.drawings.push(m); changed(); }
         s.pending = null; if (m.tool === 'angle') hint.textContent = HINTS.angle;
         paint();
       };
       s.canvas.addEventListener('pointerup', up); s.canvas.addEventListener('pointercancel', up);
+      // While a tool is on, the touch belongs to the drawing: stop the browser treating it as a scroll, fling or zoom.
+      ['touchstart', 'touchmove'].forEach(t => s.canvas.addEventListener(t, ev => { if (tool) ev.preventDefault(); }, {passive: false}));
     });
+    const REST = matchMedia('(pointer: coarse)').matches ? 'Drag the bar to move through the swing. Pick a tool to draw on the video.'
+      : 'Space plays and pauses. The arrow keys step one frame. Pick a tool to draw on the video.';
+    hint.textContent = REST;
+    const changed = () => { if (opts.onMarks) opts.onMarks(stages.map(s => s.drawings)); };
     const savePicture = () => {
       const tiles = stages.map(s => {
         const c = document.createElement('canvas'); c.width = s.video.videoWidth || 720; c.height = s.video.videoHeight || 960;
@@ -459,9 +503,14 @@
       tiles.forEach(c => { const ww = Math.round(c.width * hh / c.height); ctx.drawImage(c, x, 0, ww, hh); x += ww; });
       out.toBlob(blob => {
         if (!blob) return;
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `tracer-tennis-frame-${master.frame}.png`;
+        const name = `${opts.name || 'tracer-tennis'} frame ${master.frame}.png`, file = new File([blob], name, {type: 'image/png'});
+        if (matchMedia('(pointer: coarse)').matches && navigator.canShare && navigator.canShare({files: [file]})) {
+          navigator.share({files: [file], title: name}).catch(() => {});       // on a phone this offers Save Image, Messages, AirDrop...
+          return;
+        }
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
         document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-        hint.textContent = 'Picture saved.';
+        if (TT.toast) TT.toast('Picture saved to your downloads'); else hint.textContent = 'Picture saved.';
       }, 'image/png');
     };
 
@@ -479,8 +528,8 @@
       else if (act === 'back') step(-1);
       else if (act === 'fwd') step(1);
       else if (act === 'contact') { setPlaying(false); seekRel(0); }
-      else if (act === 'undo') { const s = [...stages].reverse().find(x => x.pending || x.drawings.length); if (s) { if (s.pending) s.pending = null; else s.drawings.pop(); } paint(); }
-      else if (act === 'clear') { stages.forEach(s => { s.drawings = []; s.pending = null; }); paint(); }
+      else if (act === 'undo') { const s = [...stages].reverse().find(x => x.pending || x.drawings.length); if (s) { if (s.pending) s.pending = null; else { s.drawings.pop(); changed(); } } paint(); }
+      else if (act === 'clear') { const had = stages.some(s => s.drawings.length); stages.forEach(s => { s.drawings = []; s.pending = null; }); if (had) changed(); paint(); }
       else if (act === 'save') savePicture();
     });
 
@@ -490,7 +539,8 @@
       toggle: () => setPlaying(!playing), step, freeze,
       showAt(frame) { freeze(frame - Math.round(master.fps * 0.3)); rate = Math.min(rate, 0.25); root.querySelector('select').value = String(rate); setTimeout(() => setPlaying(true), 120); root.scrollIntoView({behavior: 'smooth', block: 'nearest'}); },
       setZero(frame) { master.zeroFrame = frame; paint(); },
-      repaint: paint,
+      repaint: paint, savePicture,
+      spot(spec) { stages.forEach(s => { s.spot = spec; }); paint(); },
       destroy() { alive = false; cancelAnimationFrame(raf); stages.forEach(s => { s.video.pause(); s.video.removeAttribute('src'); s.video.load(); }); if (TT.activeDeck === api) TT.activeDeck = null; },
     };
     TT.activeDeck = api;

@@ -15,6 +15,7 @@ from scipy.signal import butter, find_peaks, savgol_filter, sosfiltfilt
 
 from .. import pose as P
 from .coach import coach
+from .confidence import assess
 from ..pose import PoseSequence
 
 SHOULDER_TO_ANKLE = 0.779      # fraction of stature (Winter anthropometric table)
@@ -32,6 +33,8 @@ class Metric:
     typical: str = ""
     status: str = "info"   # good | ok | work | info
     note: str = ""
+    confidence: str = "high"   # high | estimate | low: how directly one camera can see this number (see confidence.py)
+    seen: str = ""             # the reason for that level, in plain words
 
 
 @dataclass
@@ -243,9 +246,13 @@ class SwingAnalyzer:
             return "forehand", False
         return "backhand", bool(hands_gap < 0.22)
 
+    def _frames(self, seconds: float, least: int = 1) -> int:
+        """A span of time as a count of frames, so windows cover the same slice of the swing at any frame rate."""
+        return max(least, int(round(seconds * self.fps)))
+
     def _hitting_direction(self, contact: int) -> np.ndarray:
         """Horizontal unit vector (x, z) of the hand's travel into contact: the best pose-only proxy for the hitting line."""
-        a = max(contact - 3, 0)
+        a = max(contact - self._frames(0.05), 0)
         across = self.hand_vel[a:contact + 1, 0].mean()   # image plane, includes the body's own travel
         depth = (self.world[contact, self.dom["wr"], 2] - self.world[a, self.dom["wr"], 2]) / max(self.t[contact] - self.t[a], 1e-3)
         u = np.array([across, depth])
@@ -266,7 +273,7 @@ class SwingAnalyzer:
         stroke, two_handed = self._classify(lo, contact)
 
         # swing direction in the image at contact; backswing ends where the hand is furthest back along it
-        v = self.hand_vel[max(contact - 2, 0):contact + 1].mean(axis=0)
+        v = self.hand_vel[max(contact - self._frames(0.033), 0):contact + 1].mean(axis=0)
         direction = v / (np.linalg.norm(v) + 1e-9)
         mid_hip = (xy[:, P.L_HIP] + xy[:, P.R_HIP]) / 2
         progress = ((xy[:, d["wr"]] - mid_hip) * direction).sum(1) * self.m_per_px
@@ -375,12 +382,12 @@ class SwingAnalyzer:
         add("hip_rotation_speed", "Peak hip rotation speed", round(pel_v), "deg/s", "Forward swing", typical="300-600")
         add("shoulder_rotation_speed", "Peak shoulder rotation speed", round(sho_v), "deg/s", "Forward swing", typical="500-900")
         add("hand_speed_peak", "Peak hand speed", round(hand_v, 1), "m/s", "Forward swing",
-            note=f"{hand_v * 2.237:.0f} mph, measured across the camera view. Racket-head speed is higher (not tracked yet).")
+            note=f"{hand_v * 2.237:.0f} mph, measured across the camera view. The racket head moves two to three times faster than the hand.")
         add("hand_speed_contact", "Hand speed at contact", round(float(self.hand_speed[contact]), 1), "m/s", "Contact",
             status="good" if self.hand_speed[contact] >= 0.9 * hand_v else "ok",
             note="Should still be near peak: accelerating through the ball, not slowing into it.")
         if self.racket is not None and self.racket_speed is not None:
-            seg = self.racket_speed[fwd:min(contact + 3, len(t))]
+            seg = self.racket_speed[fwd:min(contact + self._frames(0.05, 2), len(t))]
             seen_pct = round(100 * float(self.racket["seen"][back:finish + 1].mean()))
             if np.isfinite(seg).sum() >= 3:
                 head_peak = float(np.nanmax(seg))
@@ -399,7 +406,8 @@ class SwingAnalyzer:
             else:
                 add("racket_head_speed", "Racket-head speed, peak (estimate)", None, "m/s", "Forward swing",
                     note=f"Racket seen in only {seen_pct}% of swing frames. Film at 120 or 240 fps for a sharper racket.")
-        a, b = max(contact - 2, 0), min(contact + 2, len(t) - 1)
+        reach = self._frames(0.033)
+        a, b = max(contact - reach, 0), min(contact + reach, len(t) - 1)
         dxy = xy[b, d["wr"]] - xy[a, d["wr"]]
         path_angle = float(np.degrees(np.arctan2(-dxy[1], abs(dxy[0]) + 1e-9)))
         if stroke != "serve/overhead":
@@ -486,6 +494,7 @@ class SwingAnalyzer:
         add("rotation_after", "Shoulder rotation after contact", round(rot_after), "deg", "Follow-through", typical="30-70")
 
         swing.findings = self._findings(swing)
+        assess(swing, self)
         swing.coaching = coach(swing.metrics, stroke)
         return swing
 
@@ -501,7 +510,7 @@ class SwingAnalyzer:
         return across if np.dot(across, chest) >= 0 else -across
 
     def _foot_direction(self, frame: int, heel: int, toe: int) -> np.ndarray:
-        lo, hi = max(frame - 2, 0), min(frame + 3, len(self.t))
+        lo, hi = max(frame - self._frames(0.033), 0), min(frame + self._frames(0.05, 2), len(self.t))
         v = np.median((self.world[lo:hi, toe] - self.world[lo:hi, heel])[:, [0, 2]], axis=0)
         return v / (np.linalg.norm(v) + 1e-9)
 
@@ -563,11 +572,14 @@ class SwingAnalyzer:
         add("extension", "Extension: hand travel toward the target after contact", round(extension * 100), "cm", "Through the ball",
             typical="40-70", status="good" if extension >= 0.40 else "ok" if extension >= 0.25 else "work",
             note="How far the hand keeps going out toward the target before it wraps around. Short means the swing was cut off.")
-        k = min(contact + max(1, int(round(0.05 * fps))), n - 1)
-        carried = float(self.hand_speed[k] / max(self.hand_speed[contact], 1e-6))
-        add("speed_carried", "Speed kept just after contact (50 ms later)", round(100 * carried), "%", "Through the ball", typical="85 or more",
-            status="good" if carried >= 0.85 else "ok" if carried >= 0.70 else "work",
-            note="A swing that is still accelerating holds its speed past the ball. A drop here means braking at contact.")
+        tc = self.t[contact]
+        at = float(np.interp(np.linspace(tc - 0.02, tc + 0.02, 5), self.t, self.hand_speed).max())      # contact sits within a frame either way
+        later = float(np.interp(np.linspace(tc + 0.04, tc + 0.07, 4), self.t, self.hand_speed).mean())
+        carried = later / max(at, 1e-6)
+        add("speed_carried", "Hand speed kept just after contact", round(100 * carried), "%", "Through the ball", typical="75 or more",
+            status="good" if carried >= 0.75 else "ok" if carried >= 0.55 else "work",
+            note="Hand speed about 50 ms after contact against its speed at contact. The hand always gives some speed to the racket here, "
+                 "so only a large drop points to braking into the ball.")
         hips_along = self._along(((w[:, P.L_HIP] + w[:, P.R_HIP]) / 2)[:, [0, 2]], u)
         k0, k1 = max(contact - int(0.1 * fps), 0), min(contact + int(0.15 * fps), n - 1)
         weight = float(hips_along[k1] - hips_along[k0])
@@ -666,7 +678,7 @@ class SwingAnalyzer:
             seg = np.where(swing_ok, tip_up[back:contact + 1], np.nan)
             low = float(np.nanmin(seg))
             add("racket_angle_low", "Racket angle at its lowest point (negative = tip below the hand)", round(low), "deg", "Racket",
-                typical="-60 to -20", status="good" if low <= -20 else "ok" if low <= -8 else "work",
+                typical="-20 or lower", status="good" if low <= -20 else "ok" if low <= -8 else "work",
                 note="Suggested: let the tip fall 20 to 60 degrees below the hand before swinging up. That drop is what lets the racket brush up the ball.")
         if valid[contact]:
             add("racket_angle_contact", "Racket angle at contact (0 = level)", round(float(tip_up[contact])), "deg", "Racket",
