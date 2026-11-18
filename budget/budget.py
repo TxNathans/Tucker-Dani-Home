@@ -876,7 +876,7 @@ def cmd_ledger(args) -> None:
     partner, me = cfg.get("partner", "Partner"), cfg.get("me", "Me")
     ledger = json.loads(LEDGER_JSON.read_text()) if LEDGER_JSON.exists() else {"start": args.start or date.today().strftime("%Y-%m-01"), "entries": []}
     have = {e["key"]: e for e in ledger["entries"]}
-    added = []
+    added, changed = [], False
     for item in shared_items(con, cfg, ledger["start"]):
         old = have.get(item["key"])
         if old is None:
@@ -885,16 +885,22 @@ def cmd_ledger(args) -> None:
             added.append(item)
         elif not old.get("locked") and (old["share"], old["total"]) != (item["share"], item["total"]):
             old.update(item)  # amount changed after posting
+            changed = True
     ledger["entries"].sort(key=lambda e: (e["date"], e["key"]))
-    ledger["updated"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    SHARED.mkdir(exist_ok=True)
-    LEDGER_JSON.write_text(json.dumps(ledger, indent=1) + "\n")
+    # Only touch the files when something changed, so a quiet day makes no commit.
+    if added or changed or not LEDGER_MD.exists():
+        ledger["updated"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+        SHARED.mkdir(exist_ok=True)
+        LEDGER_JSON.write_text(json.dumps(ledger, indent=1) + "\n")
+    else:
+        print(f"No new shared items. {partner} owes {me} ${sum(e['share'] for e in ledger['entries']):,.2f}.")
+        return
 
     E = ledger["entries"]
     balance = sum(e["share"] for e in E)
     L = [f"# What {partner} owes {me}", "",
          f"## {partner} owes {me} **${balance:,.2f}**" if balance >= 0 else f"## {me} owes {partner} **${-balance:,.2f}**",
-         "", f"_Updated {ledger['updated']} from {me}'s linked accounts. Shared items only; nothing personal is listed here._", ""]
+         "", f"_Last changed {ledger['updated']} from {me}'s linked accounts. Shared items only; nothing personal is listed here._", ""]
     review = [e for e in E if e["kind"] == "review" and not e.get("resolved")]
     if review:
         L += ["### Needs a look", ""]
