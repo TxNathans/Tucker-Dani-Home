@@ -16,5 +16,25 @@
     "Dining & Coffee": 300,
     "Shopping": 300,
     "Subscriptions": 60
+  },
+  "split": {
+    "_how_to_use": "Shared costs. joint_accounts: words from the joint card or account names. household_categories: bills from your own accounts that are shared. partner_pays_monthly: shared bills your partner pays from his own accounts (not visible here).",
+    "partner": "Tucker",
+    "my_share_pct": 50,
+    "joint_accounts": [
+      "Joint Card"
+    ],
+    "household_categories": [
+      "Housing",
+      "Utilities"
+    ],
+    "household_keywords": [],
+    "not_household_keywords": [],
+    "partner_transfer_keywords": [
+      "tucker"
+    ],
+    "partner_pays_monthly": {
+      "Internet": 80
+    }
   }
 }

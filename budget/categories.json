@@ -29,7 +29,33 @@
       "automatic payment",
       "thank you",
       "autopymt",
-      "epayment"
+      "epayment",
+      "american express des:ach pmt",
+      "amex des:ach pmt",
+      "membership fee credit"
+    ],
+    "Loan Payments": [
+      "student ln",
+      "dept education",
+      "auto loan",
+      "car payment",
+      "loan pymt",
+      "loan payment"
+    ],
+    "Payments to People (review)": [
+      "zelle payment to"
+    ],
+    "Sports & Fitness": [
+      "tennis",
+      "usta",
+      "united states tennis",
+      "pickleball",
+      "padel",
+      "wilson sporti",
+      "pga tour superstore",
+      "soulcycle",
+      "sports management",
+      "mma"
     ],
     "Transfer": [
       "transfer",
@@ -69,7 +95,10 @@
       "verizon",
       "t-mobile",
       "spectrum",
-      "hotwire"
+      "hotwire",
+      "boynton beach ut",
+      "city of boynton",
+      "fpl direct debit"
     ],
     "Insurance": [
       "geico",
@@ -95,7 +124,13 @@
       "jiffy",
       "autozone",
       "car wash",
-      "toll"
+      "toll",
+      "marathon",
+      "gulf oil",
+      "7-eleven",
+      "paybyphone",
+      "parkmobile",
+      "pmusa"
     ],
     "Groceries": [
       "publix",
@@ -108,7 +143,11 @@
       "costco",
       "sam's club",
       "instacart",
-      "milam"
+      "milam",
+      "farmers market",
+      "farmrs mkt",
+      "garden butche",
+      "produce"
     ],
     "Dining & Coffee": [
       "starbucks",
@@ -133,7 +172,14 @@
       "bar ",
       "sushi",
       "tst*",
-      "toast"
+      "toast",
+      "chilis",
+      "cava",
+      "kafe",
+      "coffee",
+      "bakery",
+      "hibachi",
+      "blen"
     ],
     "Shopping": [
       "amazon",
@@ -149,7 +195,21 @@
       "ulta",
       "etsy",
       "shein",
-      "best buy"
+      "best buy",
+      "lululemon",
+      "vuori",
+      "apple store",
+      "zara",
+      "hm.com",
+      "h&m",
+      "jw pei",
+      "hobby lobby",
+      "crateandbarrel",
+      "crate & barrel",
+      "zwilling",
+      "onequince",
+      "quince",
+      "hello molly"
     ],
     "Subscriptions": [
       "netflix",
@@ -169,7 +229,11 @@
       "claude.ai",
       "anthropic",
       "adobe",
-      "patreon"
+      "patreon",
+      "oura",
+      "pura.com",
+      "monarch money",
+      "keepa"
     ],
     "Health & Fitness": [
       "cvs",
@@ -242,7 +306,8 @@
       "annual fee",
       "atm fee",
       "service fee",
-      "foreign transaction"
+      "foreign transaction",
+      "membership fee"
     ],
     "Cash & ATM": [
       "atm withdrawal",

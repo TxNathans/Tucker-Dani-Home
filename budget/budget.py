@@ -15,6 +15,9 @@ Commands (run from the repo root):
     python budget/budget.py report [YYYY-MM] spending, bills and savings for a month
     python budget/budget.py plan            savings rate, emergency fund and 401(k) plan
     python budget/budget.py recategorize    re-apply categories.json to every transaction
+    python budget/budget.py split [YYYY-MM] shared household bills and joint card: who owes whom
+    python budget/budget.py owe CATEGORY..  one-off shared costs (e.g. owe Honeymoon Wedding)
+    python budget/budget.py bills           auto-draft calendar for your bank accounts
 """
 
 from __future__ import annotations
@@ -42,14 +45,18 @@ ACCESS_PATH = DATA / "simplefin_access_url.txt"
 CONFIG_PATH = DATA / "config.json"
 CONFIG_EXAMPLE = HERE / "config.example.json"
 RULES_PATH = HERE / "categories.json"
+LOCAL_RULES_PATH = DATA / "categories.json"  # personal keywords (names, trips); git ignores it
 REPORTS = DATA / "reports"
 
 # IRS limits for 2026 (employee elective deferrals).
 LIMIT_401K = 24_500
 CATCHUP_401K_50 = 8_000
 
+ONE_TIME = {"Wedding", "Honeymoon", "Wedding & Honeymoon", "Travel"}  # shown, but left out of "regular" monthly spending
 NON_SPENDING = {"Transfer", "Credit Card Payment", "Income", "Savings & Investing"}
-MAX_WINDOW_DAYS = 85  # SimpleFIN Bridge allows 90 days per request
+# SimpleFIN's firewall blocks Python's default User-Agent (Cloudflare error 1010).
+USER_AGENT = "budget-tracker/1.0"
+MAX_WINDOW_DAYS = 45  # SimpleFIN Bridge recommends 45 days per request
 OVERLAP_DAYS = 5
 
 
@@ -98,8 +105,16 @@ def load_config() -> dict:
 
 
 def load_rules() -> dict:
+    """Personal rules in budget/data/categories.json are checked before the shared ones."""
     with open(RULES_PATH) as f:
-        return json.load(f)
+        rules = json.load(f)
+    if LOCAL_RULES_PATH.exists():
+        with open(LOCAL_RULES_PATH) as f:
+            local = json.load(f).get("rules", {})
+        merged = {f"local:{k}": v for k, v in local.items()}
+        merged.update(rules["rules"])
+        rules["rules"] = merged
+    return rules
 
 
 def write_private(path: Path, text: str) -> None:
@@ -117,7 +132,7 @@ def guess_kind(name: str) -> str:
     n = name.lower()
     for kind, words in [
         ("retirement", ["401", "403(b)", "403b", "ira", "roth", "retirement", "tsp"]),
-        ("credit", ["credit", "card", "visa", "mastercard", "amex", "sapphire", "freedom", "discover"]),
+        ("credit", ["credit", "card", "visa", "mastercard", "amex", "sapphire", "freedom", "discover", "rewards"]),
         ("savings", ["savings", "money market", "high yield", "hysa", "cd "]),
         ("investment", ["brokerage", "invest", "individual", "stock"]),
         ("loan", ["loan", "mortgage", "auto", "student"]),
@@ -132,7 +147,7 @@ def categorize(desc: str, amount: float, kind: str, rules: dict) -> str:
     text = desc.lower()
     for cat, words in rules["rules"].items():
         if any(w.lower() in text for w in words):
-            return cat
+            return cat.removeprefix("local:")
     if amount > 0:
         # Money in on a credit card is a payment or refund, not income.
         return "Refund" if kind == "credit" else "Income"
@@ -145,7 +160,7 @@ def apply_categories(con: sqlite3.Connection, only_new: bool) -> int:
     where = "WHERE category_locked = 0" + (" AND category IS NULL" if only_new else "")
     rows = con.execute(f"SELECT account_id, id, description, payee, amount FROM transactions {where}").fetchall()
     for r in rows:
-        desc = f"{r['payee'] or ''} {r['description'] or ''}"
+        desc = f"{r['description'] or ''} {r['payee'] or ''}"
         cat = categorize(desc, r["amount"], kinds.get(r["account_id"], "other"), rules)
         con.execute("UPDATE transactions SET category=? WHERE account_id=? AND id=?", (cat, r["account_id"], r["id"]))
     con.commit()
@@ -162,7 +177,7 @@ def cmd_setup(args) -> None:
         sys.exit("That does not look like a SimpleFIN setup token (it should be one long base64 string).")
     if not claim_url.startswith("https://"):
         sys.exit("Decoded token is not an https URL. Copy the whole setup token from SimpleFIN Bridge.")
-    req = urllib.request.Request(claim_url, data=b"", method="POST", headers={"Content-Length": "0"})
+    req = urllib.request.Request(claim_url, data=b"", method="POST", headers={"Content-Length": "0", "User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
             access_url = resp.read().decode().strip()
@@ -189,7 +204,7 @@ def simplefin_get(start: datetime, end: datetime) -> dict:
     q = urllib.parse.urlencode(
         {"start-date": int(start.timestamp()), "end-date": int(end.timestamp()), "pending": 1, "version": 2}
     )
-    req = urllib.request.Request(f"{base}/accounts?{q}", headers={"Authorization": f"Basic {auth}"})
+    req = urllib.request.Request(f"{base}/accounts?{q}", headers={"Authorization": f"Basic {auth}", "User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
             return json.load(resp)
@@ -339,6 +354,14 @@ def prev_months(ym: str, n: int) -> list[str]:
     return out
 
 
+def full_months(con, months: list[str]) -> list[str]:
+    """Drop months that began before the first synced transaction (partial data skews averages)."""
+    first = con.execute("SELECT MIN(date) FROM transactions").fetchone()[0]
+    if not first:
+        return []
+    return [m for m in months if m > first[:7] or (m == first[:7] and int(first[8:10]) <= 3)]
+
+
 def month_totals(con, ym: str) -> dict:
     s, e = month_bounds(ym)
     rows = con.execute(
@@ -348,7 +371,10 @@ def month_totals(con, ym: str) -> dict:
         (s, e),
     ).fetchall()
     income = sum(r["amount"] for r in rows if r["category"] == "Income")
-    saved = -sum(r["amount"] for r in rows if r["category"] == "Savings & Investing" and r["amount"] < 0)
+    # Saved = pay deposited straight into savings, plus money sent to savings/investing from other
+    # accounts. Moves out of savings into investments are not counted again.
+    saved = sum(r["amount"] for r in rows if r["category"] == "Income" and r["kind"] == "savings") \
+        - sum(r["amount"] for r in rows if r["category"] == "Savings & Investing" and r["amount"] < 0 and r["kind"] != "savings")
     by_cat: dict[str, float] = defaultdict(float)
     for r in rows:
         if r["category"] in NON_SPENDING:
@@ -361,12 +387,17 @@ def month_totals(con, ym: str) -> dict:
     for r in rows:
         if r["category"] not in NON_SPENDING and r["amount"] < 0:
             merchants[normalize(r["payee"] or r["description"])] -= r["amount"]
+    one_time = sum(v for c, v in by_cat.items() if c in ONE_TIME)
     return {"income": income, "spending": spending, "saved": saved, "by_cat": dict(by_cat), "refunds": refunds,
+            "one_time": one_time, "regular": spending - one_time,
             "merchants": merchants, "count": len(rows)}
 
 
 def normalize(desc: str) -> str:
     d = (desc or "").upper()
+    d = re.split(r"\s+DES:", d)[0]  # Bank of America: "FPL DIRECT DEBIT DES:ELEC PYMT ID:..."
+    d = re.sub(r"^(ONLINE BANKING PAYMENT TO|APLPAY|SQ \*|TST\* ?)", " ", d)
+    d = re.sub(r"\bCONFIRMATION.*", " ", d)
     d = re.sub(r"\b(POS|ACH|DEBIT|PURCHASE|RECURRING|PMT|PAYMENT|CARD|ONLINE|WEB|ID:?\S*|PPD|CCD)\b", " ", d)
     d = re.sub(r"[#*]\S*|\d{3,}|\b\d+/\d+\b", " ", d)
     d = re.sub(r"[^A-Z& ]+", " ", d)
@@ -443,7 +474,7 @@ def cmd_report(args) -> None:
     con = db()
     ym = args.month or date.today().strftime("%Y-%m")
     cur = month_totals(con, ym)
-    hist = [month_totals(con, m) for m in prev_months(ym, 3)]
+    hist = [month_totals(con, m) for m in full_months(con, prev_months(ym, 3))]
     hist = [h for h in hist if h["count"]]
     cfg = load_config()
     budgets = cfg.get("monthly_budgets", {})
@@ -454,8 +485,9 @@ def cmd_report(args) -> None:
     net = cur["income"] - cur["spending"]
     lines += [
         f"- Income: **{money(cur['income'])}**",
-        f"- Spending: **{money(cur['spending'])}**" + (f" (refunds {money(cur['refunds'])} already subtracted)" if cur["refunds"] else ""),
-        f"- Moved to savings/investing: **{money(cur['saved'])}**",
+        f"- Spending: **{money(cur['spending'])}**" + (f" (refunds and card credits {money(cur['refunds'])} already subtracted)" if cur["refunds"] else ""),
+        *( [f"  - Regular spending: **{money(cur['regular'])}**; one-time trips and wedding: {money(cur['one_time'])}"] if cur["one_time"] else [] ),
+        f"- Saved (pay into savings + money sent to savings/investing): **{money(cur['saved'])}**",
         f"- Left over: **{money(net)}**" + (f" ({net / cur['income']:.0%} of income)" if cur["income"] > 0 else ""),
         "",
         "## Spending by category",
@@ -506,7 +538,7 @@ def cmd_plan(args) -> None:
     con = db()
     cfg = load_config()
     this_month = date.today().strftime("%Y-%m")
-    months = prev_months(this_month, 3)
+    months = full_months(con, prev_months(this_month, 6))
     hist = [month_totals(con, m) for m in months]
     hist = [h for h in hist if h["count"]]
     lines = ["# Savings and 401(k) plan", ""]
@@ -516,7 +548,8 @@ def cmd_plan(args) -> None:
         sys.exit("Need at least one full month of transactions. Run sync first.")
 
     take_home = statistics.mean(h["income"] for h in hist)
-    spend = statistics.mean(h["spending"] for h in hist)
+    spend = statistics.mean(h["regular"] for h in hist)
+    one_time = statistics.mean(h["one_time"] for h in hist)
     saved = statistics.mean(h["saved"] for h in hist)
     bills = sum(b["monthly"] for b in find_bills(con))
     liquid = con.execute("SELECT COALESCE(SUM(balance),0) FROM accounts WHERE kind IN ('checking','savings')").fetchone()[0]
@@ -527,7 +560,8 @@ def cmd_plan(args) -> None:
         f"Based on the last {len(hist)} full month(s):",
         "",
         f"- Average take-home pay: **{money(take_home)}/month**",
-        f"- Average spending: **{money(spend)}/month** (recurring bills about {money(bills)} of that)",
+        f"- Average regular spending: **{money(spend)}/month** (recurring bills about {money(bills)} of that)"
+        + (f"; plus {money(one_time)}/month of one-time trips and wedding costs" if one_time else ""),
         f"- Average moved to savings: **{money(saved)}/month**",
         f"- Cash left over after spending: **{money(take_home - spend)}/month**"
         + (f" ({(take_home - spend) / take_home:.0%} of take-home)" if take_home > 0 else ""),
@@ -542,8 +576,11 @@ def cmd_plan(args) -> None:
     lines.append(f"Savings accounts cover **{have_months:.1f} months** of spending. Target is {target_months} months = {money(need)}.")
     if cash_savings < need:
         gap = need - cash_savings
-        lines.append(f"Gap: {money(gap)}. At {money(max(take_home - spend, 0) * 0.5)}/month (half your leftover) that takes about "
-                     f"{gap / max((take_home - spend) * 0.5, 1):.0f} months.")
+        if take_home - spend > 0:
+            lines.append(f"Gap: {money(gap)}. At {money((take_home - spend) * 0.5)}/month (half your leftover) that takes about "
+                         f"{gap / ((take_home - spend) * 0.5):.0f} months.")
+        else:
+            lines.append(f"Gap: {money(gap)}. Spending is running above take-home pay, so close that first (see the report).")
     else:
         lines.append("You're fully funded. Extra cash can go to the 401(k), a Roth IRA, or goals.")
 
@@ -619,6 +656,186 @@ def cmd_plan(args) -> None:
     print(out)
 
 
+# ---------------------------------------------------------------- shared costs with partner
+
+def cmd_split(args) -> None:
+    """Who paid the shared household costs this month, and who owes whom.
+
+    Cash basis: a joint card counts when its bill is paid, by whoever paid it. Household
+    bills paid from your own accounts count as you paying them.
+    """
+    con = db()
+    cfg = load_config().get("split") or sys.exit("Add a \"split\" section to budget/data/config.json (see config.example.json).")
+    ym = args.month or date.today().strftime("%Y-%m")
+    s, e = month_bounds(ym)
+    partner = cfg.get("partner", "Partner")
+    my_pct = cfg.get("my_share_pct", 50) / 100
+    joint_names = [n.lower() for n in cfg.get("joint_accounts", [])]
+    household = set(cfg.get("household_categories", []))
+    household_kw = [k.lower() for k in cfg.get("household_keywords", [])]
+    exclude_kw = [k.lower() for k in cfg.get("not_household_keywords", [])]
+    partner_kw = [k.lower() for k in cfg.get("partner_transfer_keywords", [partner])]
+
+    accts = {r["id"]: r for r in con.execute("SELECT * FROM accounts")}
+    joint = {i for i, a in accts.items() if any(n in a["name"].lower() for n in joint_names)}
+    rows = con.execute(
+        "SELECT * FROM transactions WHERE date >= ? AND date < ? ORDER BY date",
+        (month_bounds(ym)[0], (date.fromisoformat(e) + timedelta(days=5)).isoformat()),
+    ).fetchall()
+    in_month = [r for r in rows if r["date"] < e]
+
+    bills, joint_pay, to_partner, from_partner, joint_charges = [], [], [], [], defaultdict(float)
+    for r in in_month:
+        text = f"{r['description']} {r['payee']}".lower()
+        if r["account_id"] in joint:
+            if r["category"] == "Credit Card Payment" and r["amount"] > 0:
+                joint_pay.append(r)
+            elif r["category"] not in ("Credit Card Payment", "Transfer"):
+                joint_charges[r["category"]] -= r["amount"]
+            continue
+        if r["category"] in ("Transfer", "Payments to People (review)") and any(k in text for k in partner_kw):
+            (from_partner if r["amount"] > 0 else to_partner).append(r)
+            continue
+        is_household = (r["category"] in household or any(k in text for k in household_kw)) and not any(k in text for k in exclude_kw)
+        if is_household and r["amount"] < 0:
+            bills.append(r)
+
+    # Was each joint-card payment made from one of my accounts? Match amount within 5 days.
+    mine = [r for r in rows if r["account_id"] not in joint and r["category"] == "Credit Card Payment" and r["amount"] < 0]
+    used, me_paid_joint, partner_paid_joint = set(), 0.0, 0.0
+    for p in joint_pay:
+        d = date.fromisoformat(p["date"])
+        match = next((m for m in mine if (m["account_id"], m["id"]) not in used and abs(-m["amount"] - p["amount"]) < 0.01
+                      and abs((date.fromisoformat(m["date"]) - d).days) <= 5), None)
+        if match:
+            used.add((match["account_id"], match["id"]))
+            me_paid_joint += p["amount"]
+        else:
+            partner_paid_joint += p["amount"]
+
+    partner_bills = cfg.get("partner_pays_monthly", {})
+    my_bills = -sum(r["amount"] for r in bills)
+    partner_fixed = sum(partner_bills.values())
+    total = my_bills + me_paid_joint + partner_paid_joint + partner_fixed
+    my_paid = my_bills + me_paid_joint
+    partner_paid = partner_paid_joint + partner_fixed
+    sent = -sum(r["amount"] for r in to_partner)
+    got = sum(r["amount"] for r in from_partner)
+    # Positive = partner owes me.
+    owed = (my_paid - total * my_pct) - got + sent
+
+    L = [f"# Shared costs with {partner}: {ym}", ""]
+    L += ["## Household bills you paid", "", "| Date | Bill | Category | Amount |", "|---|---|---|---:|"]
+    for r in bills:
+        L.append(f"| {r['date']} | {normalize(r['payee'] or r['description'])} | {r['category']} | {money(-r['amount'])} |")
+    L.append(f"| | **Total** | | **{money(my_bills)}** |")
+    L += ["", f"## Joint card ({', '.join(accts[i]['name'] for i in joint) or 'none found'})", ""]
+    L.append(f"- Card bill paid by you: **{money(me_paid_joint)}**")
+    L.append(f"- Card bill paid by {partner} (or another account): **{money(partner_paid_joint)}**")
+    if joint_charges:
+        L.append(f"- New charges this month: {money(sum(joint_charges.values()))} ("
+                 + ", ".join(f"{c} {money(v)}" for c, v in sorted(joint_charges.items(), key=lambda kv: -kv[1]) if v > 0) + ")")
+    if partner_bills:
+        L += ["", f"## Bills {partner} pays (from config)", ""] + [f"- {k}: {money(v)}" for k, v in partner_bills.items()]
+    L += ["", "## Settle up", "",
+          f"- Shared total: **{money(total)}**. Your {my_pct:.0%}: {money(total * my_pct)}; {partner}'s {1 - my_pct:.0%}: {money(total * (1 - my_pct))}",
+          f"- You paid {money(my_paid)}; {partner} paid {money(partner_paid)}",
+          f"- Already sent: you to {partner} {money(sent)}; {partner} to you {money(got)}",
+          ""]
+    if abs(owed) < 1:
+        L.append("**You're even.**")
+    elif owed > 0:
+        L.append(f"**{partner} owes you {money(owed)} for {ym}.**")
+    else:
+        L.append(f"**You owe {partner} {money(-owed)} for {ym}.**")
+    L.append(f"\n_Joint card counts when its bill is paid. Bills {partner} pays from his own accounts aren't visible here; "
+             f"add them under split.partner_pays_monthly in config._")
+    out = "\n".join(L) + "\n"
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    (REPORTS / f"split-{ym}.md").write_text(out)
+    print(out)
+
+
+def cmd_owe(args) -> None:
+    """One-off shared costs (a trip, a wedding): everything in these categories, who paid, and the split."""
+    con = db()
+    cfg = load_config().get("split", {})
+    partner = cfg.get("partner", "Partner")
+    my_pct = cfg.get("my_share_pct", 50) / 100
+    joint_names = [n.lower() for n in cfg.get("joint_accounts", [])]
+    L = [f"# What {partner} owes for shared one-off costs", ""]
+    grand = 0.0
+    for cat in args.categories:
+        rows = con.execute(
+            """SELECT t.date, t.amount, t.description, a.name FROM transactions t JOIN accounts a ON a.id=t.account_id
+               WHERE t.category = ? ORDER BY t.date""", (cat,)).fetchall()
+        if not rows:
+            L += [f"## {cat}", "", "Nothing found in this category.", ""]
+            continue
+        mine = [r for r in rows if not any(n in r["name"].lower() for n in joint_names)]
+        joint = [r for r in rows if r not in mine]
+        L += [f"## {cat}", "", "| Date | What | Paid with | Amount |", "|---|---|---|---:|"]
+        for r in mine:
+            what = re.sub(r"\s+", " ", re.split(r"\s+DES:|\s+\d{2}/\d{2}\s", r["description"])[0]).removeprefix("AplPay ").title()[:34]
+            L.append(f"| {r['date']} | {what} | {r['name'][:24]} | ${-r['amount']:,.2f} |")
+        paid = -sum(r["amount"] for r in mine)
+        share = paid * (1 - my_pct)
+        grand += share
+        L += [f"| | **You paid** | | **${paid:,.2f}** |", "", f"{partner}'s {1 - my_pct:.0%}: **${share:,.2f}**"]
+        if joint:
+            L.append(f"\n(Also {money(-sum(r['amount'] for r in joint))} on the joint card, already shared through it: "
+                     + ", ".join(f"{normalize(r['description'])} {money(-r['amount'])}" for r in joint) + ".)")
+        L.append("")
+    L += [f"## Total {partner} owes you: **${grand:,.2f}**", "",
+          f"_Only charges on your own accounts are counted. If {partner} paid for anything on these trips himself, subtract half of it._"]
+    out = "\n".join(L) + "\n"
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    (REPORTS / ("owe-" + "-".join(c.lower().replace(" ", "_") for c in args.categories) + ".md")).write_text(out)
+    print(out)
+
+
+def cmd_bills(args) -> None:
+    """Auto-drafts out of checking/savings: what comes out, on what day, and how much cash to keep."""
+    con = db()
+    since = full_months(con, prev_months(date.today().strftime("%Y-%m"), 4))
+    start = (min(since) + "-01") if since else "0000"
+    rows = con.execute(
+        """SELECT t.date, t.amount, t.description, t.payee, t.category, a.name FROM transactions t
+           JOIN accounts a ON a.id=t.account_id
+           WHERE t.amount < 0 AND a.kind IN ('checking','savings') AND t.date >= ?
+             AND t.category NOT IN ('Payments to People (review)', 'Transfer', 'Venmo / Zelle (review)')""",
+        (start,),
+    ).fetchall()
+    groups: dict[tuple, list] = defaultdict(list)
+    for r in rows:
+        groups[(normalize(r["description"]), r["name"])].append(r)
+    nmonths = max(len({r["date"][:7] for r in rows}), 1)
+    drafts = []
+    for (name, acct), txs in groups.items():
+        months = {t["date"][:7] for t in txs}
+        if len(months) < min(2, nmonths):
+            continue
+        per_month = -sum(t["amount"] for t in txs) / len(months)
+        days = sorted(int(t["date"][8:10]) for t in txs)
+        drafts.append({"name": name, "acct": acct, "amt": per_month, "day": int(statistics.median(days)),
+                       "cat": txs[-1]["category"], "varies": max(-t["amount"] for t in txs) > 1.15 * min(-t["amount"] for t in txs)})
+    drafts.sort(key=lambda d: d["day"])
+    L = ["# Auto-drafts from your bank accounts", "", "| Day | What | From | About | Category |", "|---:|---|---|---:|---|"]
+    for d in drafts:
+        L.append(f"| {d['day']} | {d['name']} | {d['acct'][:22]} | {money(d['amt'])}{' (varies)' if d['varies'] else ''} | {d['cat']} |")
+    first = sum(d["amt"] for d in drafts if d["day"] <= 15)
+    second = sum(d["amt"] for d in drafts if d["day"] > 15)
+    L += ["", f"- Days 1 to 15: about **{money(first)}** comes out",
+          f"- Days 16 to 31: about **{money(second)}** comes out",
+          f"- Total per month: about **{money(first + second)}**", "",
+          "Card autopays (marked varies) depend on that month's card spending. Keep at least the bigger half-month total, "
+          "plus a cushion, in each account before its drafts hit."]
+    out = "\n".join(L) + "\n"
+    REPORTS.mkdir(parents=True, exist_ok=True)
+    (REPORTS / "bills.md").write_text(out)
+    print(out)
+
+
 # ---------------------------------------------------------------- main
 
 def main() -> None:
@@ -645,6 +862,13 @@ def main() -> None:
     s.add_argument("month", nargs="?")
     s.set_defaults(fn=cmd_report)
     sub.add_parser("plan").set_defaults(fn=cmd_plan)
+    s = sub.add_parser("split", help="shared household costs and who owes whom")
+    s.add_argument("month", nargs="?")
+    s.set_defaults(fn=cmd_split)
+    s = sub.add_parser("owe", help="split one-off shared costs, e.g.: owe Honeymoon Wedding")
+    s.add_argument("categories", nargs="+")
+    s.set_defaults(fn=cmd_owe)
+    sub.add_parser("bills", help="auto-draft calendar for your bank accounts").set_defaults(fn=cmd_bills)
     sub.add_parser("recategorize").set_defaults(fn=cmd_recategorize)
     args = p.parse_args()
     args.fn(args)
