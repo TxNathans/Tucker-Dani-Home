@@ -925,6 +925,50 @@ def cmd_ledger(args) -> None:
         print(f"  + {e['date']} {e['what']} [{e['kind']}] {partner}'s part {e['share']:+,.2f}")
 
 
+DRAFT_NAMES = {"Cmg Mortgage Inc": "Mortgage (CMG)", "American Express": "AmEx card autopay", "Dept Education": "Student loan",
+               "Fpl Direct": "FPL electric", "Morgan Stanley": "Morgan Stanley investing", "Chase Credit Crd": "Chase card autopay",
+               "Cfg": "Lexus car loan"}
+
+
+def cmd_export(args) -> None:
+    """Write ledger.json and drafts.json ({rows, meta}) for the shared bills dashboard."""
+    con = db()
+    out = Path(args.out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    L = json.loads(LEDGER_JSON.read_text())
+    rows = [{"id": e["key"] if e["key"].startswith(("carry", "manual")) else e["key"].split("|")[-1][-12:],
+             "date": e["date"], "month": e["date"][:7], "what": e["what"] + (f" ({e['note']})" if e.get("note") else ""),
+             "type": e["kind"], "category": e.get("category") or "", "paid_with": e.get("account", ""),
+             "amount": round(e["total"], 2), "tucker_part": round(e["share"], 2)} for e in L["entries"]]
+    (out / "ledger.json").write_text(json.dumps({"rows": rows, "meta": [
+        {"label": "Built from", "value": "budget/shared/ledger.json in TxNathans/Tucker-Dani-Home"},
+        {"label": "Ledger updated", "value": L.get("updated", "")}]}, indent=1))
+    since = full_months(con, prev_months(date.today().strftime("%Y-%m"), 4))
+    start = (min(since) + "-01") if since else "0000"
+    q = con.execute(
+        """SELECT t.date, t.amount, t.description, t.category, a.name FROM transactions t JOIN accounts a ON a.id=t.account_id
+           WHERE t.amount < 0 AND a.kind IN ('checking','savings') AND t.date >= ?
+             AND t.category NOT IN ('Payments to People (review)', 'Transfer', 'Venmo / Zelle (review)')""", (start,)).fetchall()
+    groups: dict[tuple, list] = defaultdict(list)
+    for r in q:
+        groups[(normalize(r["description"]), r["name"])].append(r)
+    n = max(len({r["date"][:7] for r in q}), 1)
+    drafts = []
+    for (name, acct), txs in groups.items():
+        months = {t["date"][:7] for t in txs}
+        if len(months) < min(2, n):
+            continue
+        amts = [-t["amount"] for t in txs]
+        drafts.append({"what": DRAFT_NAMES.get(name, name), "day": int(statistics.median(int(t["date"][8:10]) for t in txs)),
+                       "from_account": "Savings" if "savings" in acct.lower() else "Checking",
+                       "monthly": round(sum(amts) / len(months), 2), "varies": max(amts) > 1.15 * min(amts),
+                       "category": txs[-1]["category"], "shared": "yes" if txs[-1]["category"] in ("Housing", "Utilities") else "no"})
+    drafts.sort(key=lambda d: d["day"])
+    (out / "drafts.json").write_text(json.dumps({"rows": drafts, "meta": [
+        {"label": "Built from", "value": f"Auto-drafts in Dani's checking and savings since {start[:7]} (monthly average)"}]}, indent=1))
+    print(f"Wrote {len(rows)} ledger rows and {len(drafts)} auto-drafts to {out}")
+
+
 def cmd_bills(args) -> None:
     """Auto-drafts out of checking/savings: what comes out, on what day, and how much cash to keep."""
     con = db()
@@ -1002,6 +1046,9 @@ def main() -> None:
     s = sub.add_parser("ledger", help="update the running list of what your partner owes (budget/shared/OWED.md)")
     s.add_argument("--start", help="first date for a new ledger, YYYY-MM-DD")
     s.set_defaults(fn=cmd_ledger)
+    s = sub.add_parser("export", help="write ledger.json and drafts.json for the shared bills dashboard")
+    s.add_argument("out_dir")
+    s.set_defaults(fn=cmd_export)
     sub.add_parser("bills", help="auto-draft calendar for your bank accounts").set_defaults(fn=cmd_bills)
     sub.add_parser("recategorize").set_defaults(fn=cmd_recategorize)
     args = p.parse_args()
