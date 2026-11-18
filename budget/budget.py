@@ -144,7 +144,7 @@ def guess_kind(name: str) -> str:
 
 
 def categorize(desc: str, amount: float, kind: str, rules: dict) -> str:
-    text = desc.lower()
+    text = " ".join(desc.lower().split())  # banks pad descriptions with runs of spaces
     for cat, words in rules["rules"].items():
         if any(w.lower() in text for w in words):
             return cat.removeprefix("local:")
@@ -686,7 +686,7 @@ def cmd_split(args) -> None:
 
     bills, joint_pay, to_partner, from_partner, joint_charges = [], [], [], [], defaultdict(float)
     for r in in_month:
-        text = f"{r['description']} {r['payee']}".lower()
+        text = " ".join(f"{r['description']} {r['payee']}".lower().split())
         if r["account_id"] in joint:
             if r["category"] == "Credit Card Payment" and r["amount"] > 0:
                 joint_pay.append(r)
