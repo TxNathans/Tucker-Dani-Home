@@ -1,0 +1,299 @@
+{
+ "start": "2026-11-01",
+ "entries": [
+  {
+   "key": "carry|2026-10",
+   "date": "2026-10-31",
+   "what": "Honeymoon + wedding (Dani paid $5,731.20); Sep-Oct household bills settled by Venmo",
+   "account": "",
+   "category": "",
+   "total": 5731.2,
+   "kind": "carried over",
+   "share": 2865.6,
+   "locked": true
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-62e59531-58d2-41f1-b33d-b0ad33f6a095",
+   "date": "2026-11-01",
+   "what": "The Boys Farmdelray Beach",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 116.86,
+   "kind": "joint card",
+   "share": 58.43
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-3a0bed88-9fed-41a7-8786-f90ccb0c0d6a",
+   "date": "2026-11-02",
+   "what": "Tst* Koco Cafboynton Beach",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 16.46,
+   "kind": "joint card",
+   "share": 8.23
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-3c59eeb0-8070-45c2-bccb-f35243d140d2",
+   "date": "2026-11-03",
+   "what": "Tst* Living Gboca Raton",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 33.02,
+   "kind": "joint card",
+   "share": 16.51
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-acd1bdef-1d0c-48a2-b036-4eed43053adc",
+   "date": "2026-11-06",
+   "what": "Wholefds Boy Boynton Beach",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 37.13,
+   "kind": "joint card",
+   "share": 18.57
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-f705a50d-f40d-4e29-b036-c0fa33152d24",
+   "date": "2026-11-06",
+   "what": "The Boys Farmdelray Beach",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 80.81,
+   "kind": "joint card",
+   "share": 40.41
+  },
+  {
+   "key": "ACT-b49f3522-067d-460d-968c-754f097a6c87|TRN-c5df27f7-33fa-4b92-a42a-9508e2dd9db5",
+   "date": "2026-11-06",
+   "what": "Cmg Mortgage Inc",
+   "account": "Adv Plus Banking- 8014 (",
+   "category": "Housing",
+   "total": 5544.14,
+   "kind": "household bill",
+   "share": 2772.07
+  },
+  {
+   "key": "manual|2026-11-06",
+   "date": "2026-11-06",
+   "what": "Venmo from Tucker",
+   "note": "$2,750, counted as his full half of the November mortgage",
+   "account": "Venmo",
+   "category": "",
+   "total": 2750.0,
+   "kind": "from Tucker",
+   "share": -2772.07,
+   "locked": true
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-0e522d10-dfa7-4e06-bf01-17d0a67a76ca",
+   "date": "2026-11-07",
+   "what": "Wholefds Boy Boynton Beach",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 18.86,
+   "kind": "joint card",
+   "share": 9.43
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-4b9250ae-09b9-4e8f-ac1e-0d31462e11e4",
+   "date": "2026-11-07",
+   "what": "Tst* Living Gboca Raton",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 34.6,
+   "kind": "joint card",
+   "share": 17.3
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-76340edb-7f3f-4206-84e2-2ab9dc35c79b",
+   "date": "2026-11-07",
+   "what": "Tst* Brooklynboca Raton",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 8.28,
+   "kind": "joint card",
+   "share": 4.14
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-ce65a433-ad4e-4e3b-b301-2e743507e6e4",
+   "date": "2026-11-08",
+   "what": "Wholefds Dbr Beach",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 25.0,
+   "kind": "joint card",
+   "share": 12.5
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-60cd95f1-8031-4fc1-813f-432c9e7f8f31",
+   "date": "2026-11-09",
+   "what": "Tst* Farmhousdelray Beach",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 71.34,
+   "kind": "joint card",
+   "share": 35.67
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-44651ebf-f22a-4fe5-9d1a-52a2f62c6d03",
+   "date": "2026-11-10",
+   "what": "Expedia Expedia.Com",
+   "account": "American Express Gold Ca",
+   "category": "London Trip",
+   "total": 505.5,
+   "kind": "trip",
+   "share": 252.75
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-783a35d8-2237-420d-9ece-e91e2420c830",
+   "date": "2026-11-10",
+   "what": "Car Rental On Bookinlondon",
+   "account": "American Express Gold Ca",
+   "category": "London Trip",
+   "total": 140.88,
+   "kind": "trip",
+   "share": 70.44
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-4e1a87eb-fee6-484b-9a35-b7e371757081",
+   "date": "2026-11-12",
+   "what": "Amex Dunkin' Credit",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": -4.57,
+   "kind": "joint card",
+   "share": -2.29
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-5bd2ef1d-7f1c-4b5f-8247-88f41d11ab29",
+   "date": "2026-11-12",
+   "what": "Dunkin Beach",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 4.57,
+   "kind": "joint card",
+   "share": 2.29
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-5d28617c-aa57-4ca3-bc96-0c15b9eaf6ee",
+   "date": "2026-11-12",
+   "what": "Tst* Vinny'S Boca Raton",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 39.49,
+   "kind": "joint card",
+   "share": 19.75
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-713e2057-7f51-4149-9085-c1aee92b7606",
+   "date": "2026-11-12",
+   "what": "Publix Delray Beach",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 64.95,
+   "kind": "joint card",
+   "share": 32.48
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-17ec584c-a9fe-4bb8-8e42-aece02a6eb29",
+   "date": "2026-11-13",
+   "what": "Tst* Mister Oboynton Beach",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 70.22,
+   "kind": "joint card",
+   "share": 35.11
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-40b5e378-5c1f-4e03-bd19-4365de58fe8b",
+   "date": "2026-11-13",
+   "what": "Starbucks 800-782-",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 25.0,
+   "kind": "joint card",
+   "share": 12.5
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-c0af0173-40b0-4e32-bd48-79b2f23a18c4",
+   "date": "2026-11-13",
+   "what": "Wholefds Boy Boynton Beach",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 69.01,
+   "kind": "joint card",
+   "share": 34.51
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-ac3aa68f-2c76-4aaf-97dd-8abebb65c548",
+   "date": "2026-11-14",
+   "what": "Chilis Delray Beach Delray Beach",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 69.96,
+   "kind": "joint card",
+   "share": 34.98
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-036022c0-1310-41b5-a8e8-b3b028f99d02",
+   "date": "2026-11-15",
+   "what": "Wholefds Boy Boynton Beach",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 55.99,
+   "kind": "joint card",
+   "share": 28.0
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-52e0e27a-2386-417c-a726-7636e5aba055",
+   "date": "2026-11-15",
+   "what": "Tst* Maman - Delray Beach",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 58.85,
+   "kind": "joint card",
+   "share": 29.43
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-6cdfa0d4-9b9f-4d04-a041-00fcc0fe842e",
+   "date": "2026-11-15",
+   "what": "Boynton Beach Utboynton Beach",
+   "account": "American Express Gold Ca",
+   "category": "Utilities",
+   "total": 548.73,
+   "kind": "joint card",
+   "share": 274.37
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-22b6cd1c-62ba-4b05-9592-483e868da7aa",
+   "date": "2026-11-16",
+   "what": "Hobby Lobby Boca Raton",
+   "account": "American Express Gold Ca",
+   "category": "Shopping",
+   "total": 107.17,
+   "kind": "joint card",
+   "share": 53.59
+  },
+  {
+   "key": "ACT-b49f3522-067d-460d-968c-754f097a6c87|TRN-9ca4741b-6c4d-4b49-9307-39ba5378b792",
+   "date": "2026-11-16",
+   "what": "Fpl Direct Debit",
+   "account": "Adv Plus Banking- 8014 (",
+   "category": "Utilities",
+   "total": 425.98,
+   "kind": "household bill",
+   "share": 212.99
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-2d5109e3-6895-485c-8f4d-96f1c4b4c894",
+   "date": "2026-11-17",
+   "what": "Walmart Bentonville",
+   "account": "American Express Gold Ca",
+   "category": "Shopping",
+   "total": 65.16,
+   "kind": "joint card",
+   "share": 32.58
+  }
+ ],
+ "updated": "2026-11-18 16:37 UTC"
+}

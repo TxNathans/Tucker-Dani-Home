@@ -1,0 +1,29 @@
+{
+  "_note": "Keywords the shared split needs. Checked before budget/categories.json.",
+  "rules": {
+    "Honeymoon": [
+      "excellence",
+      "isla mujeres",
+      "bansi,s.a",
+      "servicios com",
+      "airshop",
+      "benito juarez",
+      "jetblue airways corp"
+    ],
+    "Wedding": [
+      "fl50b-south courthou",
+      "delray sands",
+      "waylett photography"
+    ],
+    "London Trip": [
+      "expedia 735855414230",
+      "car rental on bookin"
+    ],
+    "Transfer": [
+      "zelle payment to tucker",
+      "zelle payment from tucker",
+      "venmo des:cashout",
+      "venmo des:payment"
+    ]
+  }
+}

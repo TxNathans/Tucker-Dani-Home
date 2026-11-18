@@ -18,6 +18,7 @@ Commands (run from the repo root):
     python budget/budget.py split [YYYY-MM] shared household bills and joint card: who owes whom
     python budget/budget.py owe CATEGORY..  one-off shared costs (e.g. owe Honeymoon Wedding)
     python budget/budget.py bills           auto-draft calendar for your bank accounts
+    python budget/budget.py ledger          update the running shared ledger in budget/shared/
 """
 
 from __future__ import annotations
@@ -47,6 +48,12 @@ CONFIG_EXAMPLE = HERE / "config.example.json"
 RULES_PATH = HERE / "categories.json"
 LOCAL_RULES_PATH = DATA / "categories.json"  # personal keywords (names, trips); git ignores it
 REPORTS = DATA / "reports"
+# Shared with Tucker in git: split settings, the keywords the split needs, and the running ledger.
+SHARED = HERE / "shared"
+SHARED_SPLIT = SHARED / "split.json"
+SHARED_RULES = SHARED / "categories.json"
+LEDGER_JSON = SHARED / "ledger.json"
+LEDGER_MD = SHARED / "OWED.md"
 
 # IRS limits for 2026 (employee elective deferrals).
 LIMIT_401K = 24_500
@@ -101,6 +108,9 @@ def load_config() -> dict:
     with open(src) as f:
         cfg = json.load(f)
     cfg["_from_example"] = src == CONFIG_EXAMPLE
+    if SHARED_SPLIT.exists():
+        with open(SHARED_SPLIT) as f:
+            cfg["split"] = json.load(f)
     return cfg
 
 
@@ -108,12 +118,14 @@ def load_rules() -> dict:
     """Personal rules in budget/data/categories.json are checked before the shared ones."""
     with open(RULES_PATH) as f:
         rules = json.load(f)
-    if LOCAL_RULES_PATH.exists():
-        with open(LOCAL_RULES_PATH) as f:
-            local = json.load(f).get("rules", {})
-        merged = {f"local:{k}": v for k, v in local.items()}
-        merged.update(rules["rules"])
-        rules["rules"] = merged
+    merged = {}
+    for path in (LOCAL_RULES_PATH, SHARED_RULES):
+        if path.exists():
+            with open(path) as f:
+                for k, v in json.load(f).get("rules", {}).items():
+                    merged.setdefault(f"local:{k}", []).extend(v)
+    merged.update(rules["rules"])
+    rules["rules"] = merged
     return rules
 
 
@@ -194,9 +206,11 @@ def cmd_setup(args) -> None:
 
 
 def simplefin_get(start: datetime, end: datetime) -> dict:
-    if not ACCESS_PATH.exists():
+    # SIMPLEFIN_ACCESS_URL lets a scheduled cloud run use a credential its network proxy injects.
+    raw = os.environ.get("SIMPLEFIN_ACCESS_URL") or (ACCESS_PATH.read_text().strip() if ACCESS_PATH.exists() else "")
+    if not raw:
         sys.exit("Not connected yet. Run: python budget/budget.py setup YOUR_SETUP_TOKEN")
-    access = urllib.parse.urlsplit(ACCESS_PATH.read_text().strip())
+    access = urllib.parse.urlsplit(raw)
     base = f"{access.scheme}://{access.hostname}{':' + str(access.port) if access.port else ''}{access.path}"
     auth = base64.b64encode(
         f"{urllib.parse.unquote(access.username or '')}:{urllib.parse.unquote(access.password or '')}".encode()
@@ -807,6 +821,110 @@ def cmd_owe(args) -> None:
     print(out)
 
 
+def shared_items(con, cfg: dict, since: str) -> list[dict]:
+    """Every posted transaction since `since` that affects what the partner owes."""
+    partner = cfg.get("partner", "Partner")
+    their = 1 - cfg.get("my_share_pct", 50) / 100
+    joint_names = [n.lower() for n in cfg.get("joint_accounts", [])]
+    household = set(cfg.get("household_categories", []))
+    household_kw = [k.lower() for k in cfg.get("household_keywords", [])]
+    not_household = [k.lower() for k in cfg.get("not_household_keywords", [])]
+    one_off = set(cfg.get("one_off_categories", []))
+    skip_joint = set(cfg.get("exclude_categories", [])) | {"Credit Card Payment", "Transfer"} | (ONE_TIME - {"Travel"})
+    partner_kw = [k.lower() for k in cfg.get("partner_transfer_keywords", [partner])]
+    review_kw = [k.lower() for k in cfg.get("review_keywords", [])]
+    out = []
+    rows = con.execute(
+        """SELECT t.*, a.name AS acct FROM transactions t JOIN accounts a ON a.id=t.account_id
+           WHERE t.date >= ? AND t.pending = 0 ORDER BY t.date""", (since,)).fetchall()
+    for r in rows:
+        text = " ".join(f"{r['description']} {r['payee']}".lower().split())
+        joint = any(n in r["acct"].lower() for n in joint_names)
+        what = re.split(r"\s+DES:|\s+ID:|\s+Conf#", r["description"])[0]
+        what = re.sub(r"^(AplPay|TST\*|SQ \*|B2P\*|IN \*)\s*|\s+[A-Z]{2}$|\d{4,}|#\S*", " ", what.strip())
+        what = re.sub(r"\s+", " ", what).strip().title()[:40]
+        item = {"key": f"{r['account_id']}|{r['id']}", "date": r["date"], "what": what, "account": r["acct"][:24],
+                "category": r["category"], "total": round(-r["amount"], 2)}
+        if r["category"] in one_off:
+            item.update(kind="trip", share=round(-r["amount"] * their, 2))
+        elif joint:
+            if r["category"] == "Credit Card Payment" and r["amount"] > 0:
+                item.update(kind="card paid", share=0.0, total=r["amount"])
+            elif r["category"] in skip_joint:
+                continue
+            else:
+                item.update(kind="joint card", share=round(-r["amount"] * their, 2))
+        elif r["category"] in ("Transfer", "Payments to People (review)") and any(k in text for k in partner_kw):
+            # Money from the partner lowers what they owe; money sent to them raises it.
+            item.update(kind=f"from {partner}" if r["amount"] > 0 else f"to {partner}", share=round(-r["amount"], 2),
+                        total=abs(r["amount"]))
+        elif any(k in text for k in review_kw):
+            item.update(kind="review", share=0.0, total=r["amount"])
+        elif r["amount"] < 0 and (r["category"] in household or any(k in text for k in household_kw)) \
+                and not any(k in text for k in not_household):
+            item.update(kind="household bill", share=round(-r["amount"] * their, 2))
+        else:
+            continue
+        out.append(item)
+    return out
+
+
+def cmd_ledger(args) -> None:
+    """Add new shared items to the running ledger in budget/shared and rewrite OWED.md."""
+    con = db()
+    cfg = load_config().get("split") or sys.exit("No split settings found (budget/shared/split.json).")
+    partner, me = cfg.get("partner", "Partner"), cfg.get("me", "Me")
+    ledger = json.loads(LEDGER_JSON.read_text()) if LEDGER_JSON.exists() else {"start": args.start or date.today().strftime("%Y-%m-01"), "entries": []}
+    have = {e["key"]: e for e in ledger["entries"]}
+    added = []
+    for item in shared_items(con, cfg, ledger["start"]):
+        old = have.get(item["key"])
+        if old is None:
+            ledger["entries"].append(item)
+            have[item["key"]] = item
+            added.append(item)
+        elif not old.get("locked") and (old["share"], old["total"]) != (item["share"], item["total"]):
+            old.update(item)  # amount changed after posting
+    ledger["entries"].sort(key=lambda e: (e["date"], e["key"]))
+    ledger["updated"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    SHARED.mkdir(exist_ok=True)
+    LEDGER_JSON.write_text(json.dumps(ledger, indent=1) + "\n")
+
+    E = ledger["entries"]
+    balance = sum(e["share"] for e in E)
+    L = [f"# What {partner} owes {me}", "",
+         f"## {partner} owes {me} **${balance:,.2f}**" if balance >= 0 else f"## {me} owes {partner} **${-balance:,.2f}**",
+         "", f"_Updated {ledger['updated']} from {me}'s linked accounts. Shared items only; nothing personal is listed here._", ""]
+    review = [e for e in E if e["kind"] == "review" and not e.get("resolved")]
+    if review:
+        L += ["### Needs a look", ""]
+        L += [f"- {e['date']}: {e['what']} {money(e['total'])}. If this was from {partner}, tell Claude and it gets counted." for e in review]
+        L.append("")
+    L += ["## By month", "", f"| Month | Shared costs {me} paid | {partner}'s share | {partner} paid | Added to balance |", "|---|---:|---:|---:|---:|"]
+    months = sorted({e["date"][:7] for e in E}, reverse=True)
+    for m in months:
+        es = [e for e in E if e["date"][:7] == m]
+        costs = sum(e["total"] for e in es if e["kind"] in ("household bill", "joint card", "trip", "carried over"))
+        owed = sum(e["share"] for e in es if e["share"] > 0 and not e["kind"].startswith("to "))
+        paid = -sum(e["share"] for e in es if e["kind"].startswith("from "))
+        L.append(f"| {m} | {money(costs)} | {money(owed)} | {money(paid)} | {money(sum(e['share'] for e in es))} |")
+    for m in months:
+        L += ["", f"### {m}", "", f"| Date | What | Type | Amount | {partner}'s part |", "|---|---|---|---:|---:|"]
+        for e in reversed([e for e in E if e["date"][:7] == m]):
+            part = "" if e["share"] == 0 else (f"${e['share']:,.2f}" if e["share"] > 0 else f"-${-e['share']:,.2f}")
+            note = f" ({e['note']})" if e.get("note") else ""
+            L.append(f"| {e['date']} | {e['what']}{note} | {e['kind']} | ${e['total']:,.2f} | {part} |")
+    L += ["", "## How this works", "",
+          f"- Household bills {me} pays (mortgage, electric, water and other utilities) and every charge on the joint Gold card are split "
+          f"{100 - cfg.get('my_share_pct', 50)}% to {partner}. Gold card charges count when they post, so paying the card bill doesn't count them again.",
+          "- Shared trips are listed as trip. Payments between you lower or raise the balance.",
+          f"- Venmo cash-outs are listed under Needs a look, since a cash-out can include money from other people."]
+    LEDGER_MD.write_text("\n".join(L) + "\n")
+    print(f"{len(added)} new item(s). {partner} owes {me} ${balance:,.2f}." if balance >= 0 else f"{len(added)} new item(s). {me} owes {partner} ${-balance:,.2f}.")
+    for e in added:
+        print(f"  + {e['date']} {e['what']} [{e['kind']}] {partner}'s part {e['share']:+,.2f}")
+
+
 def cmd_bills(args) -> None:
     """Auto-drafts out of checking/savings: what comes out, on what day, and how much cash to keep."""
     con = db()
@@ -881,6 +999,9 @@ def main() -> None:
     s = sub.add_parser("owe", help="split one-off shared costs, e.g.: owe Honeymoon Wedding")
     s.add_argument("categories", nargs="+")
     s.set_defaults(fn=cmd_owe)
+    s = sub.add_parser("ledger", help="update the running list of what your partner owes (budget/shared/OWED.md)")
+    s.add_argument("--start", help="first date for a new ledger, YYYY-MM-DD")
+    s.set_defaults(fn=cmd_ledger)
     sub.add_parser("bills", help="auto-draft calendar for your bank accounts").set_defaults(fn=cmd_bills)
     sub.add_parser("recategorize").set_defaults(fn=cmd_recategorize)
     args = p.parse_args()
