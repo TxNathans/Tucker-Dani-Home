@@ -675,6 +675,8 @@ def cmd_split(args) -> None:
     household_kw = [k.lower() for k in cfg.get("household_keywords", [])]
     exclude_kw = [k.lower() for k in cfg.get("not_household_keywords", [])]
     partner_kw = [k.lower() for k in cfg.get("partner_transfer_keywords", [partner])]
+    # True when you pay the whole joint card bill: split its charges as they happen, not its payments.
+    joint_by_charges = cfg.get("i_pay_joint_card", False)
 
     accts = {r["id"]: r for r in con.execute("SELECT * FROM accounts")}
     joint = {i for i, a in accts.items() if any(n in a["name"].lower() for n in joint_names)}
@@ -690,7 +692,7 @@ def cmd_split(args) -> None:
         if r["account_id"] in joint:
             if r["category"] == "Credit Card Payment" and r["amount"] > 0:
                 joint_pay.append(r)
-            elif r["category"] not in ("Credit Card Payment", "Transfer"):
+            elif r["category"] not in ("Credit Card Payment", "Transfer") and r["category"] not in ONE_TIME - {"Travel"}:
                 joint_charges[r["category"]] -= r["amount"]
             continue
         if r["category"] in ("Transfer", "Payments to People (review)") and any(k in text for k in partner_kw):
@@ -713,6 +715,8 @@ def cmd_split(args) -> None:
         else:
             partner_paid_joint += p["amount"]
 
+    if joint_by_charges:
+        me_paid_joint, partner_paid_joint = sum(joint_charges.values()), 0.0
     partner_bills = cfg.get("partner_pays_monthly", {})
     my_bills = -sum(r["amount"] for r in bills)
     partner_fixed = sum(partner_bills.values())
@@ -730,8 +734,12 @@ def cmd_split(args) -> None:
         L.append(f"| {r['date']} | {normalize(r['payee'] or r['description'])} | {r['category']} | {money(-r['amount'])} |")
     L.append(f"| | **Total** | | **{money(my_bills)}** |")
     L += ["", f"## Joint card ({', '.join(accts[i]['name'] for i in joint) or 'none found'})", ""]
-    L.append(f"- Card bill paid by you: **{money(me_paid_joint)}**")
-    L.append(f"- Card bill paid by {partner} (or another account): **{money(partner_paid_joint)}**")
+    if joint_by_charges:
+        L.append(f"- You pay this card, so every charge is split as it happens. Charges this month: **{money(me_paid_joint)}**"
+                 " (wedding and honeymoon charges are left out; use the owe command for those)")
+    else:
+        L.append(f"- Card bill paid by you: **{money(me_paid_joint)}**")
+        L.append(f"- Card bill paid by {partner} (or another account): **{money(partner_paid_joint)}**")
     if joint_charges:
         L.append(f"- New charges this month: {money(sum(joint_charges.values()))} ("
                  + ", ".join(f"{c} {money(v)}" for c, v in sorted(joint_charges.items(), key=lambda kv: -kv[1]) if v > 0) + ")")
@@ -748,7 +756,7 @@ def cmd_split(args) -> None:
         L.append(f"**{partner} owes you {money(owed)} for {ym}.**")
     else:
         L.append(f"**You owe {partner} {money(-owed)} for {ym}.**")
-    L.append(f"\n_Joint card counts when its bill is paid. Bills {partner} pays from his own accounts aren't visible here; "
+    L.append(f"\n_{'Joint card charges count when charged' if joint_by_charges else 'Joint card counts when its bill is paid'}. Bills {partner} pays from his own accounts aren't visible here; "
              f"add them under split.partner_pays_monthly in config._")
     out = "\n".join(L) + "\n"
     REPORTS.mkdir(parents=True, exist_ok=True)
@@ -772,7 +780,7 @@ def cmd_owe(args) -> None:
         if not rows:
             L += [f"## {cat}", "", "Nothing found in this category.", ""]
             continue
-        mine = [r for r in rows if not any(n in r["name"].lower() for n in joint_names)]
+        mine = [r for r in rows if cfg.get("i_pay_joint_card") or not any(n in r["name"].lower() for n in joint_names)]
         joint = [r for r in rows if r not in mine]
         L += [f"## {cat}", "", "| Date | What | Paid with | Amount |", "|---|---|---|---:|"]
         for r in mine:
