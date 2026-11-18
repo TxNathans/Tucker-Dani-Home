@@ -3,8 +3,21 @@
 Source: ChatGPT transfer packet, research snapshot Oct 1, 2026 (`honeymoon-transfer-packet-2026-10-01.pdf`).
 All prices below are from that snapshot and must be rechecked before paying for anything.
 
-## Status
-Nothing booked yet (as of Oct 2, 2026).
+## Status (Oct 2, 2026)
+- [x] **Resort BOOKED.** Excellence Coral Playa Mujeres, Two-Story Rooftop Terrace Suite with Private Pool (not Club), Oct 17-22, 5 nights, 2 adults, all-inclusive. Booking ID **unuh52xgs2**. Booked direct with the Rewards member rate (Dani's Rewards account): **$2,914** total, fees and taxes included (43% off $5,112). "Reserve now and pay later": card charged **Oct 4, 2026**. Free cancellation until Oct 16 at 3:00 PM, then the penalty is the full $2,914. Celebration set to Honeymoon. Comments: honeymoon, upgrade request, gluten-free, quiet room.
+  - Declined the checkout upsell to Club Junior Suite (+$15/night): smaller room, no private pool.
+  - Promo codes checked (EXCEL30 etc.): none applied on top of the member rate. The Suites + Flight bundle was not cheaper ($3,604 for the base Junior Suite vs $3,587 separately).
+- [x] **JetBlue BOOKED.** Confirmation code **LUZLYJ**. 2 adults (DANIELLE RIVERA, Tucker Nathans), Main fare (free seat selection, carry-on included, no change fees; JetBlue credit if cancelled, not cash). **$1,107.88** total ($718 fare + $389.88 taxes/fees).
+  - Out Sat Oct 17: B6 2095 FLL 10:07 AM -> CUN 11:03 AM.
+  - Back Thu Oct 22: B6 1796 CUN 2:01 PM -> FLL 4:49 PM.
+  - Higher than the $954 estimate: the cheaper fares sold out. Cheaper options on other sites (BudgetAir $982, Trip.com $1,006, Expedia $1,028) were all for Main Base, so we booked direct.
+  - [ ] Pick seats (free) for both flights at jetblue.com Manage Trips.
+  - [ ] Checked bags if needed (from $45 per bag each way). The Amex airline credit can cover them if JetBlue is the chosen airline.
+  - [ ] Check Dani's TrueBlue number is on her traveler record (it wasn't at checkout).
+  - Skipped Allianz trip protection ($86.96). The Amex Platinum has its own trip insurance.
+- [ ] Email the resort (draft in Gmail: "Honeymoon arrival Oct 17"). Transfer: book through the SCHEDULE TRANSFER link (Seasons Tours) in the confirmation email.
+- Itinerary and restaurant plan: [honeymoon-itinerary.md](honeymoon-itinerary.md)
+- [ ] Xenotes, Mon Oct 19
 
 ## The plan
 - **Wedding:** Friday Oct 16, 2026, morning, courthouse in Delray Beach, FL. Stay local that night.
@@ -50,7 +63,8 @@ Optional extras: couples spa (~$586 with pre-arrival discount), photo session.
 
 ## Gluten-free (Dani)
 - Put it on the resort reservation and the Xenotes booking.
-- At each meal: "One guest requires gluten-free food. Please have the chef identify safe options and note the allergy for the kitchen."
+- Gluten-free is a **preference** for Dani, not an allergy (updated Oct 2).
+- At each meal: "One of us prefers gluten-free. Could the chef point out the gluten-free options?"
 
 ## Note for the resort reservation
 > We will be getting married the morning of Friday, October 16, 2026, at the courthouse in Delray Beach, Florida, and will be traveling to Excellence Coral Playa Mujeres the following morning for our honeymoon. We would like to request any complimentary honeymoon benefits available for our stay. We will bring a copy of our marriage certificate. One guest also requires gluten-free meals, so please add that dietary requirement to our reservation. If possible, we would appreciate a quiet, romantic room location and any honeymoon touches you may be able to arrange for our arrival. Thank you.
