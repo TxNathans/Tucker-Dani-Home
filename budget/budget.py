@@ -692,7 +692,8 @@ def cmd_split(args) -> None:
         if r["account_id"] in joint:
             if r["category"] == "Credit Card Payment" and r["amount"] > 0:
                 joint_pay.append(r)
-            elif r["category"] not in ("Credit Card Payment", "Transfer") and r["category"] not in ONE_TIME - {"Travel"}:
+            elif r["category"] not in ("Credit Card Payment", "Transfer") and r["category"] not in ONE_TIME - {"Travel"} \
+                    and r["category"] not in cfg.get("exclude_categories", []):
                 joint_charges[r["category"]] -= r["amount"]
             continue
         if r["category"] in ("Transfer", "Payments to People (review)") and any(k in text for k in partner_kw):

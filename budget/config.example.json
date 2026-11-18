@@ -18,7 +18,7 @@
     "Subscriptions": 60
   },
   "split": {
-    "_how_to_use": "Shared costs. joint_accounts: words from the joint card or account names. household_categories: bills from your own accounts that are shared. partner_pays_monthly: shared bills your partner pays from his own accounts (not visible here). i_pay_joint_card: true if you pay the whole joint card bill, so its charges are split as they happen.",
+    "_how_to_use": "Shared costs. joint_accounts: words from the joint card or account names. household_categories: bills from your own accounts that are shared. partner_pays_monthly: shared bills your partner pays from his own accounts (not visible here). i_pay_joint_card: true if you pay the whole joint card bill, so its charges are split as they happen. exclude_categories: categories kept out of the monthly split (e.g. a trip settled separately with the owe command).",
     "partner": "Tucker",
     "my_share_pct": 50,
     "joint_accounts": [
@@ -36,6 +36,7 @@
     "partner_pays_monthly": {
       "Internet": 80
     },
-    "i_pay_joint_card": false
+    "i_pay_joint_card": false,
+    "exclude_categories": []
   }
 }
