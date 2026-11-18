@@ -54,6 +54,13 @@ SHARED_SPLIT = SHARED / "split.json"
 SHARED_RULES = SHARED / "categories.json"
 LEDGER_JSON = SHARED / "ledger.json"
 LEDGER_MD = SHARED / "OWED.md"
+SHARED_OVERRIDES = SHARED / "overrides.json"  # {row_id: partner's percent} set on the shared dashboard
+
+
+def row_id(key: str) -> str:
+    """Short stable id for a ledger entry, used by the dashboards."""
+    import hashlib
+    return key if key.startswith(("carry", "manual")) else hashlib.sha1(key.encode()).hexdigest()[:12]
 
 # IRS limits for 2026 (employee elective deferrals).
 LIMIT_401K = 24_500
@@ -402,8 +409,19 @@ def month_totals(con, ym: str) -> dict:
         if r["category"] not in NON_SPENDING and r["amount"] < 0:
             merchants[normalize(r["payee"] or r["description"])] -= r["amount"]
     one_time = sum(v for c, v in by_cat.items() if c in ONE_TIME)
+    # The partner's half of shared costs is not Dani's spending: it comes back to her.
+    partner_by_cat: dict[str, float] = defaultdict(float)
+    split_cfg = load_config().get("split")
+    if split_cfg:
+        for it in shared_items(con, split_cfg, s):
+            if it["date"] < e and it["kind"] in ("household bill", "joint card", "trip"):
+                partner_by_cat[it["category"]] += it["share"]
+    partner_one_time = sum(v for c, v in partner_by_cat.items() if c in ONE_TIME or c in (split_cfg or {}).get("one_off_categories", []))
+    partner_regular = sum(partner_by_cat.values()) - partner_one_time
     return {"income": income, "spending": spending, "saved": saved, "by_cat": dict(by_cat), "refunds": refunds,
             "one_time": one_time, "regular": spending - one_time,
+            "partner_by_cat": dict(partner_by_cat), "partner_regular": partner_regular, "partner_one_time": partner_one_time,
+            "my_regular": spending - one_time - partner_regular, "my_one_time": one_time - partner_one_time,
             "merchants": merchants, "count": len(rows)}
 
 
@@ -833,6 +851,7 @@ def shared_items(con, cfg: dict, since: str) -> list[dict]:
     skip_joint = set(cfg.get("exclude_categories", [])) | {"Credit Card Payment", "Transfer"} | (ONE_TIME - {"Travel"})
     partner_kw = [k.lower() for k in cfg.get("partner_transfer_keywords", [partner])]
     review_kw = [k.lower() for k in cfg.get("review_keywords", [])]
+    overrides = json.loads(SHARED_OVERRIDES.read_text()) if SHARED_OVERRIDES.exists() else {}
     out = []
     rows = con.execute(
         """SELECT t.*, a.name AS acct FROM transactions t JOIN accounts a ON a.id=t.account_id
@@ -865,6 +884,10 @@ def shared_items(con, cfg: dict, since: str) -> list[dict]:
             item.update(kind="household bill", share=round(-r["amount"] * their, 2))
         else:
             continue
+        pct = overrides.get(row_id(item["key"]))
+        if pct is not None and item["kind"] in ("household bill", "joint card", "trip"):
+            item["share"] = round(-r["amount"] * float(pct) / 100, 2)
+            item["override"] = float(pct)
         out.append(item)
     return out
 
@@ -1046,13 +1069,21 @@ def cmd_export(args) -> None:
     out = Path(args.out_dir)
     out.mkdir(parents=True, exist_ok=True)
     L = json.loads(LEDGER_JSON.read_text())
-    rows = [{"id": e["key"] if e["key"].startswith(("carry", "manual")) else e["key"].split("|")[-1][-12:],
+    rows = [{"id": row_id(e["key"]),
              "date": e["date"], "month": e["date"][:7], "what": e["what"] + (f" ({e['note']})" if e.get("note") else ""),
              "type": e["kind"], "category": e.get("category") or "", "paid_with": e.get("account", ""),
-             "amount": round(e["total"], 2), "tucker_part": round(e["share"], 2)} for e in L["entries"]]
+             "amount": round(e["total"], 2), "tucker_part": round(e["share"], 2),
+             "split": e.get("override", 50.0) if e["kind"] in ("household bill", "joint card", "trip") else None} for e in L["entries"]]
     (out / "ledger.json").write_text(json.dumps({"rows": rows, "meta": [
         {"label": "Built from", "value": "budget/shared/ledger.json in TxNathans/Tucker-Dani-Home"},
         {"label": "Ledger updated", "value": L.get("updated", "")}]}, indent=1))
+    drafts, start = build_drafts(con)
+    (out / "drafts.json").write_text(json.dumps({"rows": drafts, "meta": [
+        {"label": "Built from", "value": f"Auto-drafts in Dani's checking and savings since {start[:7]} (monthly average)"}]}, indent=1))
+    print(f"Wrote {len(rows)} ledger rows and {len(drafts)} auto-drafts to {out}")
+
+
+def build_drafts(con) -> tuple[list[dict], str]:
     since = full_months(con, prev_months(date.today().strftime("%Y-%m"), 4))
     start = (min(since) + "-01") if since else "0000"
     q = con.execute(
@@ -1074,9 +1105,140 @@ def cmd_export(args) -> None:
                        "monthly": round(sum(amts) / len(months), 2), "varies": max(amts) > 1.15 * min(amts),
                        "category": txs[-1]["category"], "shared": "yes" if txs[-1]["category"] in ("Housing", "Utilities") else "no"})
     drafts.sort(key=lambda d: d["day"])
-    (out / "drafts.json").write_text(json.dumps({"rows": drafts, "meta": [
-        {"label": "Built from", "value": f"Auto-drafts in Dani's checking and savings since {start[:7]} (monthly average)"}]}, indent=1))
-    print(f"Wrote {len(rows)} ledger rows and {len(drafts)} auto-drafts to {out}")
+    return drafts, start
+
+
+RECURRING_CATS = {"Housing", "Utilities", "Insurance", "Subscriptions", "Loan Payments", "Fees & Interest",
+                  "Sports & Fitness", "Health & Fitness"}
+
+
+def cmd_export_personal(args) -> None:
+    """Files for Dani's private money dashboard. Nothing here goes to git."""
+    con = db()
+    out = Path(args.out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    first = con.execute("SELECT MIN(date) FROM transactions").fetchone()[0] or date.today().isoformat()
+    this = date.today().strftime("%Y-%m")
+    months_all = sorted({r[0] for r in con.execute("SELECT DISTINCT substr(date,1,7) FROM transactions")})
+    full = set(full_months(con, months_all))
+    r2 = lambda v: round(v, 2)
+    months, cats = [], []
+    for m in months_all:
+        if m not in full and m != this:
+            continue
+        t = month_totals(con, m)
+        months.append({"month": m, "complete": m != this, "take_home": r2(t["income"]), "regular": r2(t["regular"]),
+                       "tucker_regular": r2(t["partner_regular"]), "my_regular": r2(t["my_regular"]),
+                       "one_time": r2(t["one_time"]), "my_one_time": r2(t["my_one_time"]), "saved": r2(t["saved"])})
+        for c, v in t["by_cat"].items():
+            tp = t["partner_by_cat"].get(c, 0.0)
+            cats.append({"month": m, "category": c, "total": r2(v), "tucker_part": r2(tp), "mine": r2(v - tp),
+                         "one_time": c in ONE_TIME})
+    pay = defaultdict(lambda: {"to_checking": 0.0, "to_savings": 0.0})
+    for r in con.execute("""SELECT t.date, t.amount, a.kind FROM transactions t JOIN accounts a ON a.id=t.account_id
+                            WHERE t.category='Income' AND (t.description LIKE '%PAYROLL%')"""):
+        pay[r["date"]]["to_savings" if r["kind"] == "savings" else "to_checking"] += r["amount"]
+    paychecks = [{"date": d, "to_checking": r2(v["to_checking"]), "to_savings": r2(v["to_savings"]),
+                  "total": r2(v["to_checking"] + v["to_savings"])} for d, v in sorted(pay.items())]
+    accounts = [{"name": a["name"], "institution": a["institution"], "kind": a["kind"], "balance": r2(a["balance"] or 0),
+                 "as_of": a["balance_date"]} for a in con.execute("SELECT * FROM accounts ORDER BY kind, name")]
+    # Recurring charges anywhere (cards included): a subscription and annual-fee watch.
+    groups: dict[str, list] = defaultdict(list)
+    for r in con.execute("""SELECT t.date, t.amount, t.description, t.payee, t.category FROM transactions t
+                            WHERE t.amount < 0 AND t.pending = 0 AND t.category NOT IN
+                            ('Transfer','Credit Card Payment','Payments to People (review)','Savings & Investing','Venmo / Zelle (review)')"""):
+        if r["category"] in RECURRING_CATS or "fee" in r["description"].lower():
+            name = normalize(r["description"])
+            groups[DRAFT_NAMES.get(name, name)].append(r)
+    recurring = []
+    for name, txs in groups.items():
+        ms = sorted({t["date"][:7] for t in txs})
+        amts = [-t["amount"] for t in txs]
+        fee = any(("annual" in t["description"].lower() or "membership fee" in t["description"].lower()) for t in txs)
+        if not fee and (len(ms) < 2 or len(txs) > len(ms) * 2):
+            continue
+        med = statistics.median(amts)
+        if not fee and max(amts) > med * 1.6:
+            continue
+        last = max(txs, key=lambda t: t["date"])
+        yearly = med if fee else med * 12
+        recurring.append({"name": name, "category": txs[-1]["category"], "typical": r2(med), "yearly": r2(yearly),
+                          "kind": "annual fee" if fee else "monthly", "last_date": last["date"], "last_amount": r2(-last["amount"]),
+                          "first_seen": min(t["date"] for t in txs), "went_up": (-last["amount"]) > med * 1.10,
+                          "maybe_business": "keepa" in name.lower()})
+    recurring.sort(key=lambda x: -x["yearly"])
+    credits = [{"date": r["date"], "card": r["name"], "credit": " ".join(r["description"].split())[:40], "amount": r2(r["amount"])}
+               for r in con.execute("""SELECT t.date, t.amount, t.description, a.name FROM transactions t JOIN accounts a ON a.id=t.account_id
+                                       WHERE a.kind='credit' AND t.amount > 0 AND lower(t.description) LIKE '%credit%'
+                                         AND t.category != 'Credit Card Payment' ORDER BY t.date""")]
+    drafts, _ = build_drafts(con)
+    note = [{"label": "Built from", "value": f"Dani's linked accounts via SimpleFIN, {first} to {date.today().isoformat()}"}]
+    for name, rows in [("months", months), ("categories", cats), ("paychecks", paychecks), ("accounts", accounts),
+                       ("recurring", recurring), ("credits", credits), ("drafts", drafts)]:
+        (out / f"{name}.json").write_text(json.dumps({"rows": rows, "meta": note}, indent=1))
+    print("Wrote " + ", ".join(f"{n} ({len(r)})" for n, r in [("months", months), ("categories", cats), ("paychecks", paychecks),
+          ("accounts", accounts), ("recurring", recurring), ("credits", credits), ("drafts", drafts)]))
+
+
+def upcoming_drafts(con, days: int) -> list[dict]:
+    drafts, _ = build_drafts(con)
+    today = date.today()
+    out = []
+    for i in range(1, days + 1):
+        d = today + timedelta(days=i)
+        for x in drafts:
+            if x["day"] == d.day:
+                out.append({**x, "on": d.isoformat()})
+    return out
+
+
+def cmd_alerts(args) -> None:
+    """Warn when checking or savings won't cover the auto-drafts due in the next N days."""
+    con = db()
+    bal = {k: con.execute("SELECT COALESCE(SUM(balance),0) FROM accounts WHERE kind=?", (k,)).fetchone()[0] for k in ("checking", "savings")}
+    due = upcoming_drafts(con, args.days)
+    warned = False
+    for k, label in (("checking", "Checking"), ("savings", "Savings")):
+        need = sum(x["monthly"] for x in due if x["from_account"].lower() == k)
+        if need and bal[k] < need + args.cushion:
+            warned = True
+            items = ", ".join(f"{x['what']} ~${x['monthly']:,.0f} on {x['on'][5:]}" for x in due if x["from_account"].lower() == k)
+            print(f"LOW BALANCE: {label} has ${bal[k]:,.2f} but about ${need:,.2f} drafts in the next {args.days} days ({items}). "
+                  f"Move about ${need + args.cushion - bal[k]:,.0f} in before then.")
+    if not warned:
+        print(f"OK: balances cover the next {args.days} days of auto-drafts.")
+
+
+def cmd_checkin(args) -> None:
+    """Weekly summary: last 7 days of spending vs a usual week, bills coming up, and the shared balance."""
+    con = db()
+    today = date.today()
+    start = (today - timedelta(days=7)).isoformat()
+    rows = con.execute("""SELECT t.category, t.amount FROM transactions t JOIN accounts a ON a.id=t.account_id
+                          WHERE t.date > ? AND a.kind NOT IN ('retirement','investment')""", (start,)).fetchall()
+    week: dict[str, float] = defaultdict(float)
+    for r in rows:
+        if r["category"] not in NON_SPENDING and r["category"] != "Refund":
+            week[r["category"]] -= r["amount"]
+    hist = [month_totals(con, m) for m in full_months(con, prev_months(today.strftime("%Y-%m"), 3))]
+    usual = defaultdict(float)
+    for h in hist:
+        for c, v in h["by_cat"].items():
+            usual[c] += v / len(hist) / 4.33
+    total = sum(week.values())
+    print(f"Weekly check-in, week ending {today:%b %d}")
+    print(f"Spent ${total:,.0f} this week (a usual week is about ${sum(v for c, v in usual.items() if c not in ONE_TIME):,.0f}).")
+    hot = sorted(((c, v, usual.get(c, 0)) for c, v in week.items()
+                  if v > usual.get(c, 0) * 1.3 + 25 and c not in RECURRING_CATS and c not in ONE_TIME),
+                 key=lambda x: -(x[1] - x[2]))[:3]
+    for c, v, u in hot:
+        print(f"  Running high: {c} ${v:,.0f} (usual ${u:,.0f}/week)")
+    due = upcoming_drafts(con, 7)
+    if due:
+        print("Coming up: " + "; ".join(f"{x['what']} ~${x['monthly']:,.0f} on {x['on'][5:]}" for x in due))
+    if LEDGER_JSON.exists():
+        bal = sum(e["share"] for e in json.loads(LEDGER_JSON.read_text())["entries"])
+        print(f"Tucker owes you ${bal:,.2f}.")
 
 
 def cmd_bills(args) -> None:
@@ -1162,6 +1324,14 @@ def main() -> None:
     s.add_argument("--zelle", help="phone or email to show for Zelle")
     s.add_argument("--payments", help="JSON list of extra payments recorded on the dashboard")
     s.set_defaults(fn=cmd_statement)
+    s = sub.add_parser("export-personal", help="files for Dani's private money dashboard")
+    s.add_argument("out_dir")
+    s.set_defaults(fn=cmd_export_personal)
+    s = sub.add_parser("alerts", help="warn if balances won't cover upcoming auto-drafts")
+    s.add_argument("--days", type=int, default=10)
+    s.add_argument("--cushion", type=float, default=500)
+    s.set_defaults(fn=cmd_alerts)
+    sub.add_parser("checkin", help="weekly spending check-in").set_defaults(fn=cmd_checkin)
     s = sub.add_parser("export", help="write ledger.json and drafts.json for the shared bills dashboard")
     s.add_argument("out_dir")
     s.set_defaults(fn=cmd_export)
