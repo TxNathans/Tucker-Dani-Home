@@ -726,6 +726,9 @@ def cmd_split(args) -> None:
     partner_paid = partner_paid_joint + partner_fixed
     sent = -sum(r["amount"] for r in to_partner)
     got = sum(r["amount"] for r in from_partner)
+    # Payments from the partner that never hit a linked account (e.g. still in a Venmo balance).
+    manual = [m for m in cfg.get("partner_payments_manual", []) if m["date"][:7] == ym]
+    got += sum(m["amount"] for m in manual)
     # Positive = partner owes me.
     owed = (my_paid - total * my_pct) - got + sent
 
@@ -749,7 +752,8 @@ def cmd_split(args) -> None:
     L += ["", "## Settle up", "",
           f"- Shared total: **{money(total)}**. Your {my_pct:.0%}: {money(total * my_pct)}; {partner}'s {1 - my_pct:.0%}: {money(total * (1 - my_pct))}",
           f"- You paid {money(my_paid)}; {partner} paid {money(partner_paid)}",
-          f"- Already sent: you to {partner} {money(sent)}; {partner} to you {money(got)}",
+          f"- Already sent: you to {partner} {money(sent)}; {partner} to you {money(got)}"
+          + (" (includes " + ", ".join(f"{m['date']} {money(m['amount'])} {m.get('note', '')}".strip() for m in manual) + ", entered by hand)" if manual else ""),
           ""]
     if abs(owed) < 1:
         L.append("**You're even.**")
