@@ -931,6 +931,110 @@ def cmd_ledger(args) -> None:
         print(f"  + {e['date']} {e['what']} [{e['kind']}] {partner}'s part {e['share']:+,.2f}")
 
 
+def cmd_statement(args) -> None:
+    """Monthly statement for the partner: balance carried in, the month's shared items, payments, and the total.
+
+    Writes statement.txt, statement.html and subject.txt to out_dir. Extra payments (recorded on the
+    dashboard, e.g. Venmo) can be passed as a JSON list of {date, amount, note}.
+    """
+    import html as H
+    cfg = load_config().get("split") or sys.exit("No split settings found.")
+    partner, me = cfg.get("partner", "Partner"), cfg.get("me", "Me")
+    L = json.loads(LEDGER_JSON.read_text())
+    E = list(L["entries"])
+    if args.payments:
+        for i, p in enumerate(json.loads(Path(args.payments).read_text())):
+            E.append({"key": f"recorded|{i}", "date": str(p["date"]), "what": "Payment recorded on the dashboard" + (f" ({p['note']})" if p.get("note") else ""),
+                      "kind": f"from {partner}", "total": float(p["amount"]), "share": -float(p["amount"]), "category": ""})
+    ym = args.month or prev_months(date.today().strftime("%Y-%m"), 1)[0]
+    s, e = month_bounds(ym)
+    month_name = datetime.strptime(ym, "%Y-%m").strftime("%B %Y")
+    before = sum(x["share"] for x in E if x["date"] < s)
+    items = sorted([x for x in E if s <= x["date"] < e], key=lambda x: x["date"])
+    after = sum(x["share"] for x in E if x["date"] >= e)
+    total = before + sum(x["share"] for x in items) + after
+
+    def group(x):
+        k = x["kind"]
+        if k == "household bill":
+            return "Mortgage" if x.get("category") == "Housing" else "Household utilities"
+        if k == "joint card":
+            return "Gold card charges"
+        if k in ("trip", "carried over"):
+            return "Trips and one-offs"
+        if k.startswith("from "):
+            return f"Payments from {partner}"
+        if k.startswith("to "):
+            return f"Money {me} sent {partner}"
+        return None
+    groups: dict[str, list] = defaultdict(list)
+    for x in items:
+        g = group(x)
+        if g:
+            groups[g].append(x)
+    order = ["Mortgage", "Household utilities", "Gold card charges", "Trips and one-offs", f"Money {me} sent {partner}", f"Payments from {partner}"]
+    m = lambda v: f"-${-v:,.2f}" if v < 0 else f"${v:,.2f}"
+    zelle = args.zelle or "Dani"
+    owes_line = (f"You owe {me} {m(total)}." if total > 0.005 else
+                 f"{me} owes you {m(-total)}." if total < -0.005 else "You and Dani are even.")
+    subject = (f"Shared bills for {month_name}: you owe {me} {m(total)}" if total > 0.005 else f"Shared bills for {month_name}")
+
+    # Plain text
+    T = [f"Hi {partner},", "", f"Here's our shared bills summary for {month_name}. {owes_line}", "",
+         f"Balance from before {month_name}: {m(before)}"]
+    for g in order:
+        if g in groups:
+            T.append(f"{g}: {m(sum(x['share'] for x in groups[g]))}")
+    if abs(after) > 0.005:
+        T.append(f"Since {month_name} ended: {m(after)}")
+    T += [f"Total you owe now: {m(total)}", ""]
+    if total > 0.005:
+        T += [f"To pay, send {m(total)} with Zelle to {me} at {zelle}. Open your bank app, choose Send with Zelle, and enter that number.",
+              "Zelle payments are picked up automatically, so you don't need to tell me when you've paid.", ""]
+    T.append(f"Every item for {month_name} (your half):")
+    for g in order:
+        for x in groups.get(g, []):
+            T.append(f"  {x['date'][5:]}  {x['what'][:48]:48}  {m(x['total']):>11}  your part {m(x['share'])}")
+    T += ["", "Shared costs are split 50/50: the mortgage, utilities, every Gold card charge and shared trips.",
+          "This email was put together automatically from Dani's accounts by Claude."]
+    # HTML
+    rows = "".join(
+        f"<tr><td style='padding:4px 8px;color:#666'>{H.escape(x['date'][5:])}</td><td style='padding:4px 8px'>{H.escape(x['what'])}</td>"
+        f"<td style='padding:4px 8px;color:#666'>{H.escape(group(x))}</td><td style='padding:4px 8px;text-align:right'>{m(x['total'])}</td>"
+        f"<td style='padding:4px 8px;text-align:right;font-weight:600'>{m(x['share'])}</td></tr>"
+        for g in order for x in groups.get(g, []))
+    summary = "".join(f"<tr><td style='padding:4px 8px'>{H.escape(g)}</td><td style='padding:4px 8px;text-align:right'>{m(sum(x['share'] for x in groups[g]))}</td></tr>"
+                      for g in order if g in groups)
+    pay = (f"<p style='font-size:16px'><b>To pay:</b> send <b>{m(total)}</b> with Zelle to {H.escape(me)} at <b>{H.escape(zelle)}</b>. "
+           "Open your bank app, choose Send with Zelle, and enter that number. Zelle payments are picked up automatically, "
+           "so you don't need to tell me when you've paid.</p>") if total > 0.005 else ""
+    after_row = f"<tr><td style='padding:4px 8px'>Since {H.escape(month_name)} ended</td><td style='padding:4px 8px;text-align:right'>{m(after)}</td></tr>" if abs(after) > 0.005 else ""
+    Hh = f"""<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#222;max-width:640px">
+<p>Hi {H.escape(partner)},</p>
+<p>Here's our shared bills summary for {H.escape(month_name)}.</p>
+<p style="font-size:28px;margin:12px 0"><b>{H.escape(owes_line)}</b></p>
+{pay}
+<h3 style="margin:20px 0 6px">Summary</h3>
+<table style="border-collapse:collapse;font-size:14px">
+<tr><td style="padding:4px 8px">Balance from before {H.escape(month_name)}</td><td style="padding:4px 8px;text-align:right">{m(before)}</td></tr>
+{summary}{after_row}
+<tr><td style="padding:6px 8px;border-top:1px solid #ccc"><b>Total you owe now</b></td><td style="padding:6px 8px;border-top:1px solid #ccc;text-align:right"><b>{m(total)}</b></td></tr>
+</table>
+<h3 style="margin:20px 0 6px">Every item for {H.escape(month_name)}</h3>
+<table style="border-collapse:collapse;font-size:13px">
+<tr style="color:#666"><th style="text-align:left;padding:4px 8px">Date</th><th style="text-align:left;padding:4px 8px">What</th><th style="text-align:left;padding:4px 8px">Type</th><th style="text-align:right;padding:4px 8px">Amount</th><th style="text-align:right;padding:4px 8px">Your part</th></tr>
+{rows}
+</table>
+<p style="color:#666;font-size:13px;margin-top:20px">Shared costs are split 50/50: the mortgage, utilities, every Gold card charge and shared trips. This email was put together automatically from Dani's accounts by Claude.</p>
+</div>"""
+    out = Path(args.out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "statement.txt").write_text("\n".join(T) + "\n")
+    (out / "statement.html").write_text(Hh)
+    (out / "subject.txt").write_text(subject + "\n")
+    print(subject)
+
+
 DRAFT_NAMES = {"Cmg Mortgage Inc": "Mortgage (CMG)", "American Express": "AmEx card autopay", "Dept Education": "Student loan",
                "Fpl Direct": "FPL electric", "Morgan Stanley": "Morgan Stanley investing", "Chase Credit Crd": "Chase card autopay",
                "Cfg": "Lexus car loan"}
@@ -1052,6 +1156,12 @@ def main() -> None:
     s = sub.add_parser("ledger", help="update the running list of what your partner owes (budget/shared/OWED.md)")
     s.add_argument("--start", help="first date for a new ledger, YYYY-MM-DD")
     s.set_defaults(fn=cmd_ledger)
+    s = sub.add_parser("statement", help="monthly email statement for your partner")
+    s.add_argument("out_dir")
+    s.add_argument("--month", help="YYYY-MM (default: last month)")
+    s.add_argument("--zelle", help="phone or email to show for Zelle")
+    s.add_argument("--payments", help="JSON list of extra payments recorded on the dashboard")
+    s.set_defaults(fn=cmd_statement)
     s = sub.add_parser("export", help="write ledger.json and drafts.json for the shared bills dashboard")
     s.add_argument("out_dir")
     s.set_defaults(fn=cmd_export)
