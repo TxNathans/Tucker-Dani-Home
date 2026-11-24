@@ -290,6 +290,8 @@ def cmd_sync(args) -> None:
     print(f"Synced {accts} accounts, {seen_tx} transactions seen, {n} newly categorized.")
     for w in dict.fromkeys(warnings):
         print(f"  SimpleFIN note: {w}")
+    for line in stale_feeds(con):
+        print("  " + line)
 
 
 # ---------------------------------------------------------------- CSV import
@@ -728,7 +730,7 @@ def cmd_split(args) -> None:
                     and r["category"] not in cfg.get("exclude_categories", []):
                 joint_charges[r["category"]] -= r["amount"]
             continue
-        if r["category"] in ("Transfer", "Payments to People (review)") and any(k in text for k in partner_kw):
+        if r["category"] in PARTNER_PAYMENT_CATS and any(k in text for k in partner_kw):
             (from_partner if r["amount"] > 0 else to_partner).append(r)
             continue
         is_household = (r["category"] in household or any(k in text for k in household_kw)) and not any(k in text for k in exclude_kw)
@@ -839,6 +841,10 @@ def cmd_owe(args) -> None:
     print(out)
 
 
+# A Zelle or Venmo naming the partner counts as a payment whatever the bank calls it.
+PARTNER_PAYMENT_CATS = ("Transfer", "Payments to People (review)", "Venmo / Zelle (review)", "Income")
+
+
 def shared_items(con, cfg: dict, since: str) -> list[dict]:
     """Every posted transaction since `since` that affects what the partner owes."""
     partner = cfg.get("partner", "Partner")
@@ -873,7 +879,7 @@ def shared_items(con, cfg: dict, since: str) -> list[dict]:
                 continue
             else:
                 item.update(kind="joint card", share=round(-r["amount"] * their, 2))
-        elif r["category"] in ("Transfer", "Payments to People (review)") and any(k in text for k in partner_kw):
+        elif r["category"] in PARTNER_PAYMENT_CATS and any(k in text for k in partner_kw):
             # Money from the partner lowers what they owe; money sent to them raises it.
             item.update(kind=f"from {partner}" if r["amount"] > 0 else f"to {partner}", share=round(-r["amount"], 2),
                         total=abs(r["amount"]))
@@ -903,6 +909,17 @@ def cmd_ledger(args) -> None:
     for item in shared_items(con, cfg, ledger["start"]):
         old = have.get(item["key"])
         if old is None:
+            if item["kind"].startswith(("from ", "to ")):
+                # A payment entered by hand that the bank feed now shows: keep the bank's row only.
+                d = date.fromisoformat(item["date"])
+                dup = next((e for e in ledger["entries"] if e["key"].startswith("manual|") and e["kind"] == item["kind"]
+                            and abs(e["total"] - item["total"]) <= 0.01
+                            and abs((date.fromisoformat(e["date"]) - d).days) <= 5), None)
+                if dup:
+                    ledger["entries"].remove(dup)
+                    have.pop(dup["key"], None)
+                    changed = True
+                    print(f"  Bank now shows the {dup['date']} payment entered by hand (${dup['total']:,.2f}); using the bank's row instead.")
             ledger["entries"].append(item)
             have[item["key"]] = item
             added.append(item)
@@ -1192,6 +1209,24 @@ def upcoming_drafts(con, days: int) -> list[dict]:
     return out
 
 
+def stale_feeds(con, weekdays: int = 3) -> list[str]:
+    """Institutions whose feed has gone quiet for `weekdays` or more weekdays."""
+    out = []
+    today = date.today()
+    rows = con.execute(
+        """SELECT a.institution, MAX(t.date) AS last FROM accounts a LEFT JOIN transactions t ON t.account_id = a.id
+           WHERE a.id NOT LIKE 'csv:%' GROUP BY a.institution""").fetchall()
+    for r in rows:
+        if not r["last"]:
+            continue
+        last = date.fromisoformat(r["last"])
+        n = sum(1 for i in range(1, (today - last).days + 1) if (last + timedelta(days=i)).weekday() < 5)
+        if n >= weekdays:
+            out.append(f"FEED STALE: {r['institution']} has sent no transactions since {last:%b %d} ({n} weekdays). "
+                       "Payments into it (like a Zelle from Tucker) won't be seen until it's reconnected in SimpleFIN Bridge.")
+    return out
+
+
 def cmd_alerts(args) -> None:
     """Warn when checking or savings won't cover the auto-drafts due in the next N days."""
     con = db()
@@ -1207,6 +1242,8 @@ def cmd_alerts(args) -> None:
                   f"Move about ${need + args.cushion - bal[k]:,.0f} in before then.")
     if not warned:
         print(f"OK: balances cover the next {args.days} days of auto-drafts.")
+    for line in stale_feeds(con):
+        print(line)
 
 
 def cmd_checkin(args) -> None:

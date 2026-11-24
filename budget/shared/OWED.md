@@ -1,20 +1,36 @@
 # What Tucker owes Dani
 
-## Tucker owes Dani **$4,210.27**
+## Tucker owes Dani **$271.34**
 
-_Updated 2026-11-18 16:37 UTC from Dani's linked accounts. Shared items only; nothing personal is listed here._
+_Last changed 2026-11-24 00:07 UTC from Dani's linked accounts. Shared items only; nothing personal is listed here._
+
+### Needs a look
+
+- 2026-11-19: Venmo $3,058. If this was from Tucker, tell Claude and it gets counted.
 
 ## By month
 
 | Month | Shared costs Dani paid | Tucker's share | Tucker paid | Added to balance |
 |---|---:|---:|---:|---:|
-| 2026-11 | $8,233 | $4,119 | $2,772 | $1,345 |
+| 2026-11 | $8,778 | $4,391 | $6,983 | -$2,594 |
 | 2026-10 | $5,731 | $2,866 | $0 | $2,866 |
 
 ### 2026-11
 
 | Date | What | Type | Amount | Tucker's part |
 |---|---|---|---:|---:|
+| 2026-11-21 | Zelle from Tucker ($4,211, "split bills november" (confirmation 99d3y8ees)) | from Tucker | $4,211.00 | -$4,211.00 |
+| 2026-11-21 | Hive Bakery & Cwest Palm Beach | joint card | $101.40 | $50.70 |
+| 2026-11-21 | Farmhouse Delradelray Beach | joint card | $80.42 | $40.21 |
+| 2026-11-21 | Azme Taco West Palm Beach | joint card | $10.00 | $5.00 |
+| 2026-11-21 | The Boys Farmdelray Beach | joint card | $126.39 | $63.20 |
+| 2026-11-19 | Venmo | review | $3,058.00 |  |
+| 2026-11-19 | Autopay Payment - Thank You | card paid | $2,718.22 |  |
+| 2026-11-19 | The Boys Farmdelray Beach | joint card | $59.94 | $29.97 |
+| 2026-11-19 | El Camino Boca Ratondelray Beach | joint card | $72.11 | $36.05 |
+| 2026-11-18 | Link.Com* Simsouth San Francisco | joint card | $1.50 | $0.75 |
+| 2026-11-18 | Tst* The Pantdelray Beach | joint card | $44.16 | $22.08 |
+| 2026-11-17 | Wholefds Boy Boynton Beach | joint card | $48.23 | $24.11 |
 | 2026-11-17 | Walmart Bentonville | joint card | $65.16 | $32.58 |
 | 2026-11-16 | Fpl Direct Debit | household bill | $425.98 | $212.99 |
 | 2026-11-16 | Hobby Lobby Boca Raton | joint card | $107.17 | $53.59 |

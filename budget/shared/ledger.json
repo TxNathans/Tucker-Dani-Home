@@ -293,7 +293,129 @@
    "total": 65.16,
    "kind": "joint card",
    "share": 32.58
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-9d1d2946-ff20-4d1a-b7c4-7368e67a923f",
+   "date": "2026-11-17",
+   "what": "Wholefds Boy Boynton Beach",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 48.23,
+   "kind": "joint card",
+   "share": 24.11
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-a00564d4-5932-461a-8209-d38d6d9a0f86",
+   "date": "2026-11-18",
+   "what": "Tst* The Pantdelray Beach",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 44.16,
+   "kind": "joint card",
+   "share": 22.08
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-c85706ae-1d60-40d9-9044-ceea8a8ce411",
+   "date": "2026-11-18",
+   "what": "Link.Com* Simsouth San Francisco",
+   "account": "American Express Gold Ca",
+   "category": "Uncategorized",
+   "total": 1.5,
+   "kind": "joint card",
+   "share": 0.75
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-db3d7006-c050-41ae-aeac-6b9212e426ee",
+   "date": "2026-11-19",
+   "what": "El Camino Boca Ratondelray Beach",
+   "account": "American Express Gold Ca",
+   "category": "Uncategorized",
+   "total": 72.11,
+   "kind": "joint card",
+   "share": 36.05
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-dc58c9ee-0d22-4d6a-9b56-a5f6bdff6fd2",
+   "date": "2026-11-19",
+   "what": "The Boys Farmdelray Beach",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 59.94,
+   "kind": "joint card",
+   "share": 29.97
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-e4f405b8-55aa-47c6-b209-f8745b477740",
+   "date": "2026-11-19",
+   "what": "Autopay Payment - Thank You",
+   "account": "American Express Gold Ca",
+   "category": "Credit Card Payment",
+   "total": 2718.22,
+   "kind": "card paid",
+   "share": 0.0
+  },
+  {
+   "key": "ACT-b49f3522-067d-460d-968c-754f097a6c87|TRN-8599fe55-8ba0-4ab9-912d-7d05d4ed4c92",
+   "date": "2026-11-19",
+   "what": "Venmo",
+   "account": "Adv Plus Banking- 8014 (",
+   "category": "Transfer",
+   "total": 3058.0,
+   "kind": "review",
+   "share": 0.0
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-0a286adc-4ffd-4920-b424-06304d71bf93",
+   "date": "2026-11-21",
+   "what": "The Boys Farmdelray Beach",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 126.39,
+   "kind": "joint card",
+   "share": 63.2
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-8deaa890-4675-4efc-a69a-7c0445ab0e46",
+   "date": "2026-11-21",
+   "what": "Azme Taco West Palm Beach",
+   "account": "American Express Gold Ca",
+   "category": "Uncategorized",
+   "total": 10.0,
+   "kind": "joint card",
+   "share": 5.0
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-908b7279-75b8-43bd-8ee0-918b515e0b7f",
+   "date": "2026-11-21",
+   "what": "Farmhouse Delradelray Beach",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 80.42,
+   "kind": "joint card",
+   "share": 40.21
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-ba7674e1-7b45-4e92-a25a-774b1a6934c3",
+   "date": "2026-11-21",
+   "what": "Hive Bakery & Cwest Palm Beach",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 101.4,
+   "kind": "joint card",
+   "share": 50.7
+  },
+  {
+   "key": "manual|2026-11-21",
+   "date": "2026-11-21",
+   "what": "Zelle from Tucker",
+   "note": "$4,211, \"split bills november\" (confirmation 99d3y8ees)",
+   "account": "Zelle",
+   "category": "",
+   "total": 4211.0,
+   "kind": "from Tucker",
+   "share": -4211.0,
+   "locked": true
   }
  ],
- "updated": "2026-11-18 16:37 UTC"
+ "updated": "2026-11-24 00:07 UTC"
 }
