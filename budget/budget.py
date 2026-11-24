@@ -1120,9 +1120,49 @@ def build_drafts(con) -> tuple[list[dict], str]:
         drafts.append({"what": DRAFT_NAMES.get(name, name), "day": int(statistics.median(int(t["date"][8:10]) for t in txs)),
                        "from_account": "Savings" if "savings" in acct.lower() else "Checking",
                        "monthly": round(sum(amts) / len(months), 2), "varies": max(amts) > 1.15 * min(amts),
-                       "category": txs[-1]["category"], "shared": "yes" if txs[-1]["category"] in ("Housing", "Utilities") else "no"})
+                       "category": txs[-1]["category"], "shared": "yes" if txs[-1]["category"] in ("Housing", "Utilities") else "no",
+                       "paid_by": "bank"})
+    drafts += card_autopays(con, start, n)
     drafts.sort(key=lambda d: d["day"])
     return drafts, start
+
+
+# Bills set to autopay on a card. Listed with the bank drafts but marked "card": the money leaves
+# checking later, through that card's own autopay, so they must not be counted against checking twice.
+CARD_BILL_CATS = ("Utilities", "Insurance", "Subscriptions", "Housing", "Loan Payments")
+CARD_BILL_NAMES = [("boynton beach ut", "Boynton Beach water"), ("progressive", "Progressive insurance"),
+                   ("apple.com/bill", "Apple subscriptions"), ("pura.com", "Pura"), ("ouraring", "Oura membership"),
+                   ("keepa", "Keepa"), ("fpl", "FPL electric"), ("anthropic", "Claude")]
+
+
+def card_autopays(con, start: str, nmonths: int) -> list[dict]:
+    cfg = load_config().get("split") or {}
+    known = [k.lower() for k in cfg.get("card_autopay_keywords", [])]  # confirmed autopays, listed after one charge
+    q = con.execute(
+        """SELECT t.date, t.amount, t.description, t.category, a.name FROM transactions t JOIN accounts a ON a.id=t.account_id
+           WHERE t.amount < 0 AND a.kind = 'credit' AND t.pending = 0 AND t.date >= ?""", (start,)).fetchall()
+    groups: dict[tuple, list] = defaultdict(list)
+    for r in q:
+        text = " ".join(r["description"].lower().split())
+        if r["category"] not in CARD_BILL_CATS and not any(k in text for k in known):
+            continue
+        name = next((nice for key, nice in CARD_BILL_NAMES if key in text), normalize(r["description"]))
+        groups[(name, r["name"])].append((r, text))
+    out = []
+    for (name, acct), rows in groups.items():
+        txs = [r for r, _ in rows]
+        months = {t["date"][:7] for t in txs}
+        confirmed = any(k in text for _, text in rows for k in known)
+        if len(months) < min(2, nmonths) and not confirmed:
+            continue
+        amts = [-t["amount"] for t in txs]
+        card = "Gold card" if "gold" in acct.lower() else "Platinum" if "platinum" in acct.lower() else \
+            "Chase card" if "rapid" in acct.lower() else acct
+        out.append({"what": name, "day": int(statistics.median(int(t["date"][8:10]) for t in txs)), "from_account": card,
+                    "monthly": round(sum(amts) / len(months), 2), "varies": max(amts) > 1.15 * min(amts),
+                    "category": txs[-1]["category"], "shared": "yes" if txs[-1]["category"] in ("Housing", "Utilities") else "no",
+                    "paid_by": "card"})
+    return out
 
 
 RECURRING_CATS = {"Housing", "Utilities", "Insurance", "Subscriptions", "Loan Payments", "Fees & Interest",
@@ -1234,10 +1274,11 @@ def cmd_alerts(args) -> None:
     due = upcoming_drafts(con, args.days)
     warned = False
     for k, label in (("checking", "Checking"), ("savings", "Savings")):
-        need = sum(x["monthly"] for x in due if x["from_account"].lower() == k)
+        need = sum(x["monthly"] for x in due if x["from_account"].lower() == k and x.get("paid_by", "bank") == "bank")
         if need and bal[k] < need + args.cushion:
             warned = True
-            items = ", ".join(f"{x['what']} ~${x['monthly']:,.0f} on {x['on'][5:]}" for x in due if x["from_account"].lower() == k)
+            items = ", ".join(f"{x['what']} ~${x['monthly']:,.0f} on {x['on'][5:]}" for x in due
+                              if x["from_account"].lower() == k and x.get("paid_by", "bank") == "bank")
             print(f"LOW BALANCE: {label} has ${bal[k]:,.2f} but about ${need:,.2f} drafts in the next {args.days} days ({items}). "
                   f"Move about ${need + args.cushion - bal[k]:,.0f} in before then.")
     if not warned:
