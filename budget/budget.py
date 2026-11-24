@@ -1132,7 +1132,9 @@ def build_drafts(con) -> tuple[list[dict], str]:
 CARD_BILL_CATS = ("Utilities", "Insurance", "Subscriptions", "Housing", "Loan Payments")
 CARD_BILL_NAMES = [("boynton beach ut", "Boynton Beach water"), ("progressive", "Progressive insurance"),
                    ("apple.com/bill", "Apple subscriptions"), ("pura.com", "Pura"), ("ouraring", "Oura membership"),
-                   ("keepa", "Keepa"), ("fpl", "FPL electric"), ("anthropic", "Claude")]
+                   ("keepa", "Keepa"), ("fpl", "FPL electric")]
+# Plans paid once a year: shown as yearly in the subscriptions list, never as a monthly autopay.
+ANNUAL_PLANS = [("anthropic", "Claude Pro (paid yearly)")]
 
 
 def card_autopays(con, start: str, nmonths: int) -> list[dict]:
@@ -1145,6 +1147,8 @@ def card_autopays(con, start: str, nmonths: int) -> list[dict]:
     for r in q:
         text = " ".join(r["description"].lower().split())
         if r["category"] not in CARD_BILL_CATS and not any(k in text for k in known):
+            continue
+        if any(k in text for k, _ in ANNUAL_PLANS):
             continue
         name = next((nice for key, nice in CARD_BILL_NAMES if key in text), normalize(r["description"]))
         groups[(name, r["name"])].append((r, text))
@@ -1223,6 +1227,17 @@ def cmd_export_personal(args) -> None:
                           "kind": "annual fee" if fee else "monthly", "last_date": last["date"], "last_amount": r2(-last["amount"]),
                           "first_seen": min(t["date"] for t in txs), "went_up": (-last["amount"]) > med * 1.10,
                           "maybe_business": "keepa" in name.lower()})
+    # Yearly plans: the largest charge in the last year is the plan; smaller ones are extras.
+    for key, nice in ANNUAL_PLANS:
+        txs = [r for r in con.execute("""SELECT t.date, t.amount, t.category FROM transactions t
+                                         WHERE t.amount < 0 AND t.pending = 0 AND lower(t.description) LIKE ?
+                                           AND t.date >= ?""", (f"%{key}%", (date.today() - timedelta(days=366)).isoformat()))]
+        if txs:
+            plan = min(txs, key=lambda t: t["amount"])
+            renews = date.fromisoformat(plan["date"]).replace(year=date.fromisoformat(plan["date"]).year + 1)
+            recurring.append({"name": nice, "category": plan["category"], "typical": r2(-plan["amount"]), "yearly": r2(-plan["amount"]),
+                              "kind": "annual fee", "last_date": plan["date"], "last_amount": r2(-plan["amount"]),
+                              "first_seen": plan["date"], "went_up": False, "maybe_business": False, "renews": renews.isoformat()})
     recurring.sort(key=lambda x: -x["yearly"])
     credits = [{"date": r["date"], "card": r["name"], "credit": " ".join(r["description"].split())[:40], "amount": r2(r["amount"])}
                for r in con.execute("""SELECT t.date, t.amount, t.description, a.name FROM transactions t JOIN accounts a ON a.id=t.account_id
