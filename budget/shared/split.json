@@ -1,0 +1,37 @@
+{
+  "_how_to_use": "Shared-cost settings used by the split and ledger commands. Percentages are whole numbers.",
+  "me": "Dani",
+  "partner": "Tucker",
+  "my_share_pct": 50,
+  "joint_accounts": [
+    "Gold Card"
+  ],
+  "i_pay_joint_card": true,
+  "household_categories": [
+    "Housing",
+    "Utilities"
+  ],
+  "household_keywords": [],
+  "not_household_keywords": [],
+  "one_off_categories": [
+    "Honeymoon",
+    "Wedding",
+    "London Trip"
+  ],
+  "exclude_categories": [
+    "London Trip"
+  ],
+  "partner_transfer_keywords": [
+    "tucker"
+  ],
+  "review_keywords": [
+    "venmo des:cashout"
+  ],
+  "partner_payments_manual": [
+    {
+      "date": "2026-11-06",
+      "amount": 2772.07,
+      "note": "Tucker paid $2,750; counted as his full half of the November mortgage"
+    }
+  ]
+}
