@@ -415,7 +415,19 @@
    "kind": "from Tucker",
    "share": -4211.0,
    "locked": true
+  },
+  {
+   "key": "manual|petsit-2026-11-24",
+   "date": "2026-11-24",
+   "what": "Pet sitting (the pups)",
+   "note": "paid by Dani, split 50/50",
+   "account": "",
+   "category": "Pets",
+   "total": 500.0,
+   "kind": "trip",
+   "share": 250.0,
+   "locked": true
   }
  ],
- "updated": "2026-11-24 00:07 UTC"
+ "updated": "2026-11-24 22:52 UTC"
 }
