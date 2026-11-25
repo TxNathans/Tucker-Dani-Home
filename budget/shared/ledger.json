@@ -417,6 +417,36 @@
    "locked": true
   },
   {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-941a7d1a-27f4-4753-b398-ad7a28b3b73d",
+   "date": "2026-11-22",
+   "what": "Tfk-Boca Raton Fl - Boca Raton",
+   "account": "American Express Gold Ca",
+   "category": "Uncategorized",
+   "total": 80.66,
+   "kind": "joint card",
+   "share": 40.33
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-ee9ae729-a2b9-4bbe-9c6f-9eb8f8f5b927",
+   "date": "2026-11-22",
+   "what": "Publix Golf",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 39.94,
+   "kind": "joint card",
+   "share": 19.97
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-a1b46d18-dbb8-4486-a2ec-c517e6f1c53b",
+   "date": "2026-11-23",
+   "what": "Willy Cafe Inboynton Beach",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 42.09,
+   "kind": "joint card",
+   "share": 21.05
+  },
+  {
    "key": "manual|petsit-2026-11-24",
    "date": "2026-11-24",
    "what": "Pet sitting (the pups)",
@@ -429,5 +459,5 @@
    "locked": true
   }
  ],
- "updated": "2026-11-24 22:52 UTC"
+ "updated": "2026-11-25 00:17 UTC"
 }
