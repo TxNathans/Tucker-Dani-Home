@@ -1,8 +1,8 @@
 # What Tucker owes Dani
 
-## Tucker owes Dani **$602.69**
+## Tucker owes Dani **$644.58**
 
-_Last changed 2026-11-25 00:17 UTC from Dani's linked accounts. Shared items only; nothing personal is listed here._
+_Last changed 2026-11-26 00:18 UTC from Dani's linked accounts. Shared items only; nothing personal is listed here._
 
 ### Needs a look
 
@@ -12,7 +12,7 @@ _Last changed 2026-11-25 00:17 UTC from Dani's linked accounts. Shared items onl
 
 | Month | Shared costs Dani paid | Tucker's share | Tucker paid | Added to balance |
 |---|---:|---:|---:|---:|
-| 2026-11 | $9,440 | $4,722 | $6,983 | -$2,263 |
+| 2026-11 | $9,524 | $4,764 | $6,983 | -$2,221 |
 | 2026-10 | $5,731 | $2,866 | $0 | $2,866 |
 
 ### 2026-11
@@ -20,10 +20,13 @@ _Last changed 2026-11-25 00:17 UTC from Dani's linked accounts. Shared items onl
 | Date | What | Type | Amount | Tucker's part |
 |---|---|---|---:|---:|
 | 2026-11-24 | Pet sitting (the pups) (paid by Dani, split 50/50) | trip | $500.00 | $250.00 |
+| 2026-11-24 | Gizzis Coffeedelray Beach | joint card | $21.65 | $10.82 |
+| 2026-11-24 | Bolay North Bboca Raton | joint card | $31.84 | $15.92 |
+| 2026-11-23 | Zelle Payment From Tucker Nathans For "S | from Tucker | $4,211.00 | -$4,211.00 |
+| 2026-11-23 | Cava Dedelray Beach | joint card | $30.30 | $15.15 |
 | 2026-11-23 | Willy Cafe Inboynton Beach | joint card | $42.09 | $21.05 |
 | 2026-11-22 | Publix Golf | joint card | $39.94 | $19.97 |
 | 2026-11-22 | Tfk-Boca Raton Fl - Boca Raton | joint card | $80.66 | $40.33 |
-| 2026-11-21 | Zelle from Tucker ($4,211, "split bills november" (confirmation 99d3y8ees)) | from Tucker | $4,211.00 | -$4,211.00 |
 | 2026-11-21 | Hive Bakery & Cwest Palm Beach | joint card | $101.40 | $50.70 |
 | 2026-11-21 | Farmhouse Delradelray Beach | joint card | $80.42 | $40.21 |
 | 2026-11-21 | Azme Taco West Palm Beach | joint card | $10.00 | $5.00 |

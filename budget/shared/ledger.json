@@ -405,18 +405,6 @@
    "share": 50.7
   },
   {
-   "key": "manual|2026-11-21",
-   "date": "2026-11-21",
-   "what": "Zelle from Tucker",
-   "note": "$4,211, \"split bills november\" (confirmation 99d3y8ees)",
-   "account": "Zelle",
-   "category": "",
-   "total": 4211.0,
-   "kind": "from Tucker",
-   "share": -4211.0,
-   "locked": true
-  },
-  {
    "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-941a7d1a-27f4-4753-b398-ad7a28b3b73d",
    "date": "2026-11-22",
    "what": "Tfk-Boca Raton Fl - Boca Raton",
@@ -447,6 +435,46 @@
    "share": 21.05
   },
   {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-a39d0dca-f6c5-49be-8fb5-949ccb0ff343",
+   "date": "2026-11-23",
+   "what": "Cava Dedelray Beach",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 30.3,
+   "kind": "joint card",
+   "share": 15.15
+  },
+  {
+   "key": "ACT-b49f3522-067d-460d-968c-754f097a6c87|TRN-844718fd-550a-48eb-b649-2232a7f7cb92",
+   "date": "2026-11-23",
+   "what": "Zelle Payment From Tucker Nathans For \"S",
+   "account": "Adv Plus Banking- 8014 (",
+   "category": "Transfer",
+   "total": 4211.0,
+   "kind": "from Tucker",
+   "share": -4211.0
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-1469b08e-afba-4d35-ad41-d5dde79d80c0",
+   "date": "2026-11-24",
+   "what": "Bolay North Bboca Raton",
+   "account": "American Express Gold Ca",
+   "category": "Uncategorized",
+   "total": 31.84,
+   "kind": "joint card",
+   "share": 15.92
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-59b0fa20-e0cd-4b16-b7fe-0a952bfc9dc1",
+   "date": "2026-11-24",
+   "what": "Gizzis Coffeedelray Beach",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 21.65,
+   "kind": "joint card",
+   "share": 10.82
+  },
+  {
    "key": "manual|petsit-2026-11-24",
    "date": "2026-11-24",
    "what": "Pet sitting (the pups)",
@@ -459,5 +487,5 @@
    "locked": true
   }
  ],
- "updated": "2026-11-25 00:17 UTC"
+ "updated": "2026-11-26 00:18 UTC"
 }
