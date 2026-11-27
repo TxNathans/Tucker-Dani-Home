@@ -1,8 +1,8 @@
 # What Tucker owes Dani
 
-## Tucker owes Dani **$644.58**
+## Tucker owes Dani **$688.47**
 
-_Last changed 2026-11-26 00:18 UTC from Dani's linked accounts. Shared items only; nothing personal is listed here._
+_Last changed 2026-11-27 00:18 UTC from Dani's linked accounts. Shared items only; nothing personal is listed here._
 
 ### Needs a look
 
@@ -12,15 +12,19 @@ _Last changed 2026-11-26 00:18 UTC from Dani's linked accounts. Shared items onl
 
 | Month | Shared costs Dani paid | Tucker's share | Tucker paid | Added to balance |
 |---|---:|---:|---:|---:|
-| 2026-11 | $9,524 | $4,764 | $6,983 | -$2,221 |
+| 2026-11 | $9,612 | $4,808 | $6,983 | -$2,177 |
 | 2026-10 | $5,731 | $2,866 | $0 | $2,866 |
 
 ### 2026-11
 
 | Date | What | Type | Amount | Tucker's part |
 |---|---|---|---:|---:|
+| 2026-11-25 | Coffee Me Up Portland | joint card | $42.88 | $21.44 |
+| 2026-11-25 | Tst* Gachi Subaltimore | joint card | $9.86 | $4.93 |
 | 2026-11-24 | Pet sitting (the pups) (paid by Dani, split 50/50) | trip | $500.00 | $250.00 |
+| 2026-11-24 | Pbi Coral Covwest Palm Beach | joint card | $25.03 | $12.52 |
 | 2026-11-24 | Gizzis Coffeedelray Beach | joint card | $21.65 | $10.82 |
+| 2026-11-24 | Wholefds Dbr Beach | joint card | $9.99 | $5.00 |
 | 2026-11-24 | Bolay North Bboca Raton | joint card | $31.84 | $15.92 |
 | 2026-11-23 | Zelle Payment From Tucker Nathans For "S | from Tucker | $4,211.00 | -$4,211.00 |
 | 2026-11-23 | Cava Dedelray Beach | joint card | $30.30 | $15.15 |

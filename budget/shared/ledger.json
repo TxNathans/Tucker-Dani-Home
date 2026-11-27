@@ -465,6 +465,16 @@
    "share": 15.92
   },
   {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-466b191d-e444-4f3e-b5fb-5ee6d77a7c2c",
+   "date": "2026-11-24",
+   "what": "Wholefds Dbr Beach",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 9.99,
+   "kind": "joint card",
+   "share": 5.0
+  },
+  {
    "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-59b0fa20-e0cd-4b16-b7fe-0a952bfc9dc1",
    "date": "2026-11-24",
    "what": "Gizzis Coffeedelray Beach",
@@ -473,6 +483,16 @@
    "total": 21.65,
    "kind": "joint card",
    "share": 10.82
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-e546097c-3629-482b-92c2-cdeec8f1e65b",
+   "date": "2026-11-24",
+   "what": "Pbi Coral Covwest Palm Beach",
+   "account": "American Express Gold Ca",
+   "category": "Uncategorized",
+   "total": 25.03,
+   "kind": "joint card",
+   "share": 12.52
   },
   {
    "key": "manual|petsit-2026-11-24",
@@ -485,7 +505,27 @@
    "kind": "trip",
    "share": 250.0,
    "locked": true
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-1540c271-e05e-4e32-9627-db6e434a582a",
+   "date": "2026-11-25",
+   "what": "Tst* Gachi Subaltimore",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 9.86,
+   "kind": "joint card",
+   "share": 4.93
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-e70e69a0-c312-4c73-a91f-38c10f41bfd2",
+   "date": "2026-11-25",
+   "what": "Coffee Me Up Portland",
+   "account": "American Express Gold Ca",
+   "category": "Dining & Coffee",
+   "total": 42.88,
+   "kind": "joint card",
+   "share": 21.44
   }
  ],
- "updated": "2026-11-26 00:18 UTC"
+ "updated": "2026-11-27 00:18 UTC"
 }
