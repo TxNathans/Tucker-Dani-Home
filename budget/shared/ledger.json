@@ -455,6 +455,16 @@
    "share": -4211.0
   },
   {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-05b527ae-e4ee-490b-bc07-d3451ccfd960",
+   "date": "2026-11-24",
+   "what": "Walmart",
+   "account": "American Express Gold Ca",
+   "category": "Shopping",
+   "total": 10.49,
+   "kind": "joint card",
+   "share": 5.25
+  },
+  {
    "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-1469b08e-afba-4d35-ad41-d5dde79d80c0",
    "date": "2026-11-24",
    "what": "Bolay North Bboca Raton",
@@ -485,6 +495,16 @@
    "share": 10.82
   },
   {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-91dca79c-03b1-40e5-a1c5-4e3fcd1fe7c4",
+   "date": "2026-11-24",
+   "what": "Hobby Lobby Boca Raton",
+   "account": "American Express Gold Ca",
+   "category": "Shopping",
+   "total": 69.1,
+   "kind": "joint card",
+   "share": 34.55
+  },
+  {
    "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-e546097c-3629-482b-92c2-cdeec8f1e65b",
    "date": "2026-11-24",
    "what": "Pbi Coral Covwest Palm Beach",
@@ -507,6 +527,16 @@
    "locked": true
   },
   {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-0dfc0c95-c9a0-418e-aa45-ae396ccef792",
+   "date": "2026-11-25",
+   "what": "Trader Joe S Portland",
+   "account": "American Express Gold Ca",
+   "category": "Groceries",
+   "total": 147.53,
+   "kind": "joint card",
+   "share": 73.77
+  },
+  {
    "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-1540c271-e05e-4e32-9627-db6e434a582a",
    "date": "2026-11-25",
    "what": "Tst* Gachi Subaltimore",
@@ -517,6 +547,16 @@
    "share": 4.93
   },
   {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-c7f7386b-2ac9-4808-81cb-ea39e32cb3dc",
+   "date": "2026-11-25",
+   "what": "Hudsonnews Stbaltimore",
+   "account": "American Express Gold Ca",
+   "category": "Uncategorized",
+   "total": 10.58,
+   "kind": "joint card",
+   "share": 5.29
+  },
+  {
    "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-e70e69a0-c312-4c73-a91f-38c10f41bfd2",
    "date": "2026-11-25",
    "what": "Coffee Me Up Portland",
@@ -525,7 +565,37 @@
    "total": 42.88,
    "kind": "joint card",
    "share": 21.44
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-e929a1c3-3e61-4064-bf35-4f9c6c36d74f",
+   "date": "2026-11-25",
+   "what": "Hannaford",
+   "account": "American Express Gold Ca",
+   "category": "Uncategorized",
+   "total": 70.1,
+   "kind": "joint card",
+   "share": 35.05
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-26085ccf-62e6-42b5-b420-58e7ac971381",
+   "date": "2026-11-26",
+   "what": "Walmart Bentonville",
+   "account": "American Express Gold Ca",
+   "category": "Shopping",
+   "total": 90.78,
+   "kind": "joint card",
+   "share": 45.39
+  },
+  {
+   "key": "ACT-2360f4c0-0d29-41d8-8f6c-3f824669d269|TRN-29f1c484-abe2-4323-bf80-551ca3aa5ed5",
+   "date": "2026-11-26",
+   "what": "Walmart Bentonville",
+   "account": "American Express Gold Ca",
+   "category": "Shopping",
+   "total": -19.87,
+   "kind": "joint card",
+   "share": -9.94
   }
  ],
- "updated": "2026-11-27 00:18 UTC"
+ "updated": "2026-11-28 00:18 UTC"
 }
